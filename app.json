@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "LK-CLIP",
+    "name": "Lussueki-CLIP",
     "slug": "LK-CLIP",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -38,7 +38,9 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "react-native-video",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,
