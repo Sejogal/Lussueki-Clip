@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { FavoritesProvider } from '@/contexts/FavoritesContext';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 export const unstable_settings = {
   anchor: 'index',
@@ -15,8 +16,9 @@ export const unstable_settings = {
 // pra um tema claro se o usuário tiver o celular no modo claro.
 export default function RootLayout() {
   return (
-    <FavoritesProvider>
-      <ThemeProvider value={DarkTheme}>
+    <AuthProvider>
+      <FavoritesProvider>
+        <ThemeProvider value={DarkTheme}>
         <Stack
           screenOptions={{
             headerShown: false,
@@ -24,6 +26,8 @@ export default function RootLayout() {
           }}
         >
           <Stack.Screen name="index" />
+          <Stack.Screen name="auth" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="categories" options={{ animation: 'fade' }} />
           <Stack.Screen
             name="iptv"
             options={{
@@ -41,8 +45,9 @@ export default function RootLayout() {
             }}
           />
         </Stack>
-        <StatusBar style="light" />
-      </ThemeProvider>
-    </FavoritesProvider>
+          <StatusBar style="light" />
+        </ThemeProvider>
+      </FavoritesProvider>
+    </AuthProvider>
   );
 }

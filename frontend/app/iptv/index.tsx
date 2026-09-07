@@ -1,5 +1,6 @@
 // app/iptv/index.tsx
 import ChannelRow from '@/components/ChannelRow';
+import MainBottomNav from '@/components/MainBottomNav';
 import { fetchIptvCatalog } from '@/services/iptv';
 import { IptvCategory, IptvChannel } from '@/utils/iptv';
 import { Ionicons } from '@expo/vector-icons';
@@ -106,9 +107,6 @@ export default function IptvScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={22} color="#fff" />
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>📺 TV ao vivo</Text>
       </View>
 
@@ -154,7 +152,7 @@ export default function IptvScreen() {
         ) : (
           <View style={styles.centerContent}>
             <Ionicons name="search-outline" size={48} color="#48484a" />
-            <Text style={styles.emptyText}>Nenhum canal encontrado para "{searchQuery}"</Text>
+            <Text style={styles.emptyText}>Nenhum canal encontrado para &quot;{searchQuery}&quot;</Text>
           </View>
         )
       ) : (
@@ -166,6 +164,7 @@ export default function IptvScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+      <MainBottomNav active="iptv" />
     </View>
   );
 }
@@ -184,13 +183,9 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 20,
     paddingTop: Platform.OS === 'ios' ? 54 : 44,
     paddingBottom: 10,
-    gap: 6,
-  },
-  backButton: {
-    padding: 6,
   },
   headerTitle: {
     fontSize: 20,

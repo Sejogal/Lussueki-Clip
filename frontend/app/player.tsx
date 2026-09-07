@@ -1,5 +1,6 @@
 // app/player.tsx
 import FavoriteButton from '@/components/FavoriteButton';
+import { useAuth } from '@/contexts/AuthContext';
 import { ARCHIVE_ITEM_PREFIX, getArchiveOrgPlayableUrl } from '@/services/archiveOrg';
 import { fetchPlaylistEntries, isDirectMediaUrl, PlaylistEntry } from '@/utils/playlist';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -106,8 +107,19 @@ function getFriendlyErrorMessage(message: string): string {
   return message;
 }
 
+function getContentKey(sourceUrl: string, title: string): string {
+  let hash = 2166136261;
+  const value = `${sourceUrl}\u0000${title}`;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `watch-${(hash >>> 0).toString(16)}`;
+}
+
 export default function PlayerScreen() {
   const params = useLocalSearchParams();
+  const { recordWatch } = useAuth();
 
   // Trata parâmetros que podem vir como array ou string
   const streamUrl = useMemo(() => {
@@ -274,8 +286,16 @@ export default function PlayerScreen() {
   // checar o valor mais recente sem precisar recriar a subscription toda
   // vez que o episódio muda.
   const selectedEpisodeRef = useRef<Episode | null>(null);
+  const recordWatchRef = useRef(recordWatch);
+  const watchedEpisodeKeyRef = useRef<string | null>(null);
   useEffect(() => {
     selectedEpisodeRef.current = selectedEpisode;
+  }, [selectedEpisode]);
+  useEffect(() => {
+    recordWatchRef.current = recordWatch;
+  }, [recordWatch]);
+  useEffect(() => {
+    watchedEpisodeKeyRef.current = null;
   }, [selectedEpisode]);
 
   // Ref para a função de retry poder ser chamada de dentro do listener de
@@ -304,6 +324,19 @@ export default function PlayerScreen() {
         setLoading(false);
         setError(null);
         retryCountRef.current = 0;
+        const episode = selectedEpisodeRef.current;
+        if (episode && streamUrl) {
+          const contentKey = getContentKey(streamUrl, episode.title);
+          if (watchedEpisodeKeyRef.current !== contentKey) {
+            watchedEpisodeKeyRef.current = contentKey;
+            void recordWatchRef.current({
+              title: episode.title || paramTitle || 'Reproduzindo...',
+              category: paramCategoryKey,
+              source_url: streamUrl,
+              content_key: contentKey,
+            }).catch((error) => console.warn('Não foi possível salvar o histórico:', error));
+          }
+        }
       } else if (status === 'error') {
         const rawMessage = statusError?.message ?? 'formato não suportado ou servidor recusou a conexão';
 
@@ -331,7 +364,7 @@ export default function PlayerScreen() {
     return () => {
       subscription.remove();
     };
-  }, [player]);
+  }, [paramCategoryKey, paramTitle, player, streamUrl]);
 
   // Contador de tentativas automáticas para erros transitórios do
   // servidor (5xx) — reseta toda vez que um episódio novo é selecionado.

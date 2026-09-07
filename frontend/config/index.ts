@@ -2,7 +2,7 @@
 
 // Nome do app usado em qualquer lugar da UI (Home, título de aba, etc).
 // Centralizado aqui pra nunca mais precisar trocar em vários arquivos.
-export const APP_NAME = 'LK-CLIP';
+export const APP_NAME = 'Lussueki clip';
 
 export type CategoryKey =
   | 'series'

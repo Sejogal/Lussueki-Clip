@@ -35,7 +35,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="C:\Users\Sejogal\Documents\FastApi\Lk-clip\venv"
+VIRTUAL_ENV="C:\Users\Sejogal\documents\projetos\lk-clip\backend\venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

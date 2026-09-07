@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+backend/venv/
+
+# Local data and secrets
+*.db
+.env
+.env.*
+!.env.example

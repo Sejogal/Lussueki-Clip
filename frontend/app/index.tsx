@@ -3,6 +3,7 @@ import CategoryRow from '@/components/CategoryRow';
 import FavoriteButton from '@/components/FavoriteButton';
 import FavoritesRow from '@/components/FavoritesRow';
 import HeroBanner from '@/components/HeroBanner';
+import MainBottomNav from '@/components/MainBottomNav';
 import PublicDomainRow from '@/components/PublicDomainRow';
 import { APP_NAME, CATEGORIES, CATEGORY_ORDER, CategoryKey } from '@/config/index';
 import { fetchCategoryContent } from '@/services/api';
@@ -174,11 +175,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{APP_NAME}</Text>
-        <TouchableOpacity style={styles.liveTvButton} onPress={() => router.push('../iptv')}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveTvButtonText}>TV ao vivo</Text>
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Lussueki <Text style={{color:'red'}} >Clip</Text></Text>
       </View>
 
       {/* Barra de pesquisa */}
@@ -217,7 +214,7 @@ export default function HomeScreen() {
         ) : (
           <View style={styles.centerContent}>
             <Ionicons name="search-outline" size={48} color="#48484a" />
-            <Text style={styles.emptyText}>Nenhum resultado para "{searchQuery}"</Text>
+            <Text style={styles.emptyText}>Nenhum resultado para &quot;{searchQuery}&quot;</Text>
           </View>
         )
       ) : (
@@ -229,13 +226,13 @@ export default function HomeScreen() {
           ListHeaderComponent={
             <>
               <HeroBanner />
-              <FavoritesRow />
             </>
           }
           contentContainerStyle={styles.categoriesList}
           showsVerticalScrollIndicator={false}
         />
       )}
+      <MainBottomNav active="home" />
     </View>
   );
 }
@@ -263,28 +260,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
     color: '#fff',
-  },
-  liveTvButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(229,9,20,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(229,9,20,0.5)',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-    gap: 6,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#e50914',
-  },
-  liveTvButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
   },
   searchContainer: {
     flexDirection: 'row',
