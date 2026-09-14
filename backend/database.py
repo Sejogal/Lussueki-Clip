@@ -114,10 +114,25 @@ def init_db() -> None:
                 UNIQUE(user_id, content_key)
             );
 
+            CREATE TABLE IF NOT EXISTS favorites (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                content_key TEXT NOT NULL,
+                title TEXT NOT NULL,
+                category TEXT,
+                source_url TEXT NOT NULL,
+                poster_url TEXT,
+                added_at TEXT NOT NULL,
+                UNIQUE(user_id, content_key)
+            );
+
             -- Acelera "últimos assistidos por esse usuário, mais recentes
             -- primeiro" (fileira "Continuar assistindo").
             CREATE INDEX IF NOT EXISTS idx_watch_history_user_recent
                 ON watch_history(user_id, last_watched_at DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_favorites_user_recent
+                ON favorites(user_id, added_at DESC);
 
             -- Postgres suporta ADD COLUMN IF NOT EXISTS nativamente —
             -- diferente do SQLite, não precisa de checagem manual pra

@@ -1,5 +1,6 @@
 // app/index.tsx
 import CategoryRow from '@/components/CategoryRow';
+import ContinueWatchingRow from '@/components/ContinueWatchingRow';
 import FavoriteButton from '@/components/FavoriteButton';
 import FavoritesRow from '@/components/FavoritesRow';
 import HeroBanner from '@/components/HeroBanner';
@@ -226,6 +227,7 @@ export default function HomeScreen() {
           ListHeaderComponent={
             <>
               <HeroBanner />
+              <ContinueWatchingRow />
             </>
           }
           contentContainerStyle={styles.categoriesList}

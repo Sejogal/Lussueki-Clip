@@ -1,6 +1,8 @@
 import {
   ApiError,
   AuthSession,
+  getHistory,
+  HistoryItem,
   getStoredSession,
   registerWatch as sendWatch,
   signIn as requestSignIn,
@@ -17,6 +19,8 @@ type AuthContextValue = {
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   recordWatch: (payload: WatchPayload) => Promise<void>;
+  history: HistoryItem[];
+  refreshHistory: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -24,12 +28,30 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
 
   useEffect(() => {
     getStoredSession()
       .then(setSession)
       .finally(() => setIsLoading(false));
   }, []);
+
+  const refreshHistory = useCallback(async () => {
+    if (!session) {
+      setHistory([]);
+      return;
+    }
+    try {
+      setHistory(await getHistory(session.accessToken));
+    } catch (error) {
+      console.error('Erro ao carregar histórico:', error);
+      setHistory([]);
+    }
+  }, [session]);
+
+  useEffect(() => {
+    void refreshHistory();
+  }, [refreshHistory]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     setSession(await requestSignIn(email.trim(), password));
@@ -49,6 +71,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       if (!session) return;
       try {
         await sendWatch(session.accessToken, payload);
+        await refreshHistory();
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
           await removeStoredSession();
@@ -57,11 +80,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
         throw error;
       }
     },
-    [session]
+    [refreshHistory, session]
   );
 
   return (
-    <AuthContext.Provider value={{ session, isLoading, signIn, signUp, signOut, recordWatch }}>
+    <AuthContext.Provider value={{ session, isLoading, signIn, signUp, signOut, recordWatch, history, refreshHistory }}>
       {children}
     </AuthContext.Provider>
   );

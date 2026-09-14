@@ -6,7 +6,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from database import get_connection
-from schemas import HistoryResponse, UserResponse, WatchRequest, WatchResponse
+from schemas import (
+    FavoriteRequest,
+    FavoriteResponse,
+    HistoryResponse,
+    UserResponse,
+    WatchRequest,
+    WatchResponse,
+)
 from security import JWT_ALGORITHM, JWT_SECRET
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -88,7 +95,7 @@ def register_watch(payload: WatchRequest, user_id: int = Depends(current_user_id
                 source_url = excluded.source_url,
                 position_seconds = excluded.position_seconds,
                 duration_seconds = COALESCE(excluded.duration_seconds, watch_history.duration_seconds),
-                view_count = watch_history.view_count + 1,
+                view_count = watch_history.view_count + CASE WHEN %s THEN 1 ELSE 0 END,
                 last_watched_at = excluded.last_watched_at
             """,
             (
@@ -100,6 +107,7 @@ def register_watch(payload: WatchRequest, user_id: int = Depends(current_user_id
                 payload.position_seconds,
                 payload.duration_seconds,
                 now,
+                payload.count_view,
             ),
         )
         row = connection.execute(
@@ -109,3 +117,49 @@ def register_watch(payload: WatchRequest, user_id: int = Depends(current_user_id
             (user_id, content_key),
         ).fetchone()
     return WatchResponse(**dict(row))
+
+
+@users_router.get("/favorites", response_model=list[FavoriteResponse])
+def get_favorites(user_id: int = Depends(current_user_id)) -> list[FavoriteResponse]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            "SELECT content_key, title, category, source_url, poster_url, added_at "
+            "FROM favorites WHERE user_id = %s ORDER BY added_at DESC",
+            (user_id,),
+        ).fetchall()
+    return [FavoriteResponse(**dict(row)) for row in rows]
+
+
+@users_router.post("/favorites", response_model=FavoriteResponse)
+def add_favorite(payload: FavoriteRequest, user_id: int = Depends(current_user_id)) -> FavoriteResponse:
+    now = datetime.now(timezone.utc).isoformat()
+    content_key = payload.content_key or hashlib.sha256(payload.source_url.encode()).hexdigest()
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO favorites
+                (user_id, content_key, title, category, source_url, poster_url, added_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT(user_id, content_key) DO UPDATE SET
+                title = excluded.title,
+                category = excluded.category,
+                source_url = excluded.source_url,
+                poster_url = excluded.poster_url
+            """,
+            (user_id, content_key, payload.title, payload.category, payload.source_url, payload.poster_url, now),
+        )
+        row = connection.execute(
+            "SELECT content_key, title, category, source_url, poster_url, added_at "
+            "FROM favorites WHERE user_id = %s AND content_key = %s",
+            (user_id, content_key),
+        ).fetchone()
+    return FavoriteResponse(**dict(row))
+
+
+@users_router.delete("/favorites/{content_key}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_favorite(content_key: str, user_id: int = Depends(current_user_id)) -> None:
+    with get_connection() as connection:
+        connection.execute(
+            "DELETE FROM favorites WHERE user_id = %s AND content_key = %s",
+            (user_id, content_key),
+        )

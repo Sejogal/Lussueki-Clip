@@ -8,6 +8,7 @@ export type AuthUser = {
   id: number;
   name: string;
   email: string;
+  plan?: 'free' | 'premium' | 'super_premium';
   login_count: number;
   last_login_at: string | null;
   created_at: string;
@@ -29,6 +30,24 @@ export type WatchPayload = {
   category?: string;
   source_url: string;
   content_key: string;
+  position_seconds?: number;
+  duration_seconds?: number | null;
+  count_view?: boolean;
+};
+
+export type HistoryItem = WatchPayload & {
+  id: number;
+  view_count: number;
+  last_watched_at: string;
+};
+
+export type FavoriteResponse = {
+  content_key: string;
+  title: string;
+  category: string | null;
+  source_url: string;
+  poster_url: string | null;
+  added_at: string;
 };
 
 export class ApiError extends Error {
@@ -74,6 +93,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function authenticatedRequest<T>(accessToken: string, path: string, options: RequestInit = {}): Promise<T> {
+  return request<T>(path, {
+    ...options,
+    headers: { ...options.headers, Authorization: `Bearer ${accessToken}` },
+  });
+}
+
 async function persistSession(session: AuthSession): Promise<AuthSession> {
   await AsyncStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
   return session;
@@ -111,9 +137,29 @@ export async function signOut(): Promise<void> {
 }
 
 export async function registerWatch(accessToken: string, payload: WatchPayload): Promise<void> {
-  await request('/users/me/history', {
+  await authenticatedRequest(accessToken, '/users/me/history', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify(payload),
+  });
+}
+
+export async function getHistory(accessToken: string): Promise<HistoryItem[]> {
+  return authenticatedRequest<HistoryItem[]>(accessToken, '/users/me/continue-watching');
+}
+
+export async function getFavorites(accessToken: string): Promise<FavoriteResponse[]> {
+  return authenticatedRequest<FavoriteResponse[]>(accessToken, '/users/me/favorites');
+}
+
+export async function addFavorite(accessToken: string, payload: Record<string, string | undefined>): Promise<FavoriteResponse> {
+  return authenticatedRequest<FavoriteResponse>(accessToken, '/users/me/favorites', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function removeFavorite(accessToken: string, contentKey: string): Promise<void> {
+  await authenticatedRequest<void>(accessToken, `/users/me/favorites/${encodeURIComponent(contentKey)}`, {
+    method: 'DELETE',
   });
 }

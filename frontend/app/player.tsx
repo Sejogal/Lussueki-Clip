@@ -153,6 +153,13 @@ export default function PlayerScreen() {
     return value ? String(value) : undefined;
   }, [params.categoryKey]);
 
+  const resumePosition = useMemo(() => {
+    if (!params.positionSeconds) return 0;
+    const value = Array.isArray(params.positionSeconds) ? params.positionSeconds[0] : params.positionSeconds;
+    const position = Number(value);
+    return Number.isFinite(position) && position > 0 ? position : 0;
+  }, [params.positionSeconds]);
+
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [resolving, setResolving] = useState(false);
@@ -298,6 +305,34 @@ export default function PlayerScreen() {
     watchedEpisodeKeyRef.current = null;
   }, [selectedEpisode]);
 
+  // Salva snapshots periódicos para que a retomada funcione em outro aparelho.
+  // O primeiro registro, feito quando o player fica pronto, conta uma visualização;
+  // os snapshots seguintes apenas atualizam a posição.
+  useEffect(() => {
+    if (!selectedEpisode || !streamUrl) return;
+    const saveProgress = () => {
+      const position = Math.max(0, Math.floor(player.currentTime || 0));
+      const duration = Number.isFinite(player.duration) && player.duration > 0
+        ? Math.floor(player.duration)
+        : undefined;
+      if (position <= 0) return;
+      void recordWatchRef.current({
+        title: selectedEpisode.title || paramTitle || 'Reproduzindo...',
+        category: paramCategoryKey,
+        source_url: streamUrl,
+        content_key: getContentKey(streamUrl, selectedEpisode.title),
+        position_seconds: position,
+        duration_seconds: duration,
+        count_view: false,
+      }).catch((error) => console.warn('Não foi possível salvar o progresso:', error));
+    };
+    const interval = setInterval(saveProgress, 15000);
+    return () => {
+      clearInterval(interval);
+      saveProgress();
+    };
+  }, [paramCategoryKey, paramTitle, player, selectedEpisode, streamUrl]);
+
   // Ref para a função de retry poder ser chamada de dentro do listener de
   // status (definido antes de attemptPlayback existir) sem closures obsoletas.
   const attemptPlaybackRef = useRef<((episode: Episode) => Promise<void>) | null>(null);
@@ -334,6 +369,9 @@ export default function PlayerScreen() {
               category: paramCategoryKey,
               source_url: streamUrl,
               content_key: contentKey,
+              position_seconds: 0,
+              duration_seconds: undefined,
+              count_view: true,
             }).catch((error) => console.warn('Não foi possível salvar o histórico:', error));
           }
         }
@@ -381,6 +419,9 @@ export default function PlayerScreen() {
         uri: episode.url,
         headers: { 'User-Agent': USER_AGENT },
       });
+      if (resumePosition > 0 && episode === selectedEpisode) {
+        player.currentTime = resumePosition;
+      }
       await player.play();
       // Não zeramos loading/error aqui: quem faz isso é o listener de
       // statusChange abaixo, que reflete o estado real do player.
@@ -415,7 +456,7 @@ export default function PlayerScreen() {
     return () => {
       cancelled = true;
     };
-  }, [player, selectedEpisode]);
+  }, [player, resumePosition, selectedEpisode]);
 
   // Timeout de segurança: se depois de 20s o status nunca mudou (nem
   // readyToPlay nem error), avisamos o usuário em vez de deixar o loading

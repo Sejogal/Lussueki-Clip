@@ -1,5 +1,5 @@
 // services/favorites.ts
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { FavoriteResponse, addFavorite, removeFavorite } from '@/services/auth';
 
 export type FavoriteItem = {
   title: string;
@@ -12,27 +12,29 @@ export type FavoriteItem = {
    * "legado" (CategoryKey) ou uma categoria de domínio público
    * (archive.org), por isso é string livre em vez do union restrito. */
   categoryKey?: string;
+  contentKey?: string;
   addedAt: number;
 };
 
-const STORAGE_KEY = 'lk-clip:favorites';
-
-export async function loadFavorites(): Promise<FavoriteItem[]> {
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (err) {
-    console.error('❌ Erro ao carregar favoritos:', err);
-    return [];
-  }
+export function toFavoriteItem(item: FavoriteResponse): FavoriteItem {
+  return {
+    title: item.title,
+    url: item.source_url,
+    posterUrl: item.poster_url ?? undefined,
+    categoryKey: item.category ?? undefined,
+    contentKey: item.content_key,
+    addedAt: Date.parse(item.added_at),
+  };
 }
 
-export async function saveFavorites(favorites: FavoriteItem[]): Promise<void> {
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(favorites));
-  } catch (err) {
-    console.error('❌ Erro ao salvar favoritos:', err);
-  }
+export function favoritePayload(item: Omit<FavoriteItem, 'addedAt'>): Record<string, string | undefined> {
+  return {
+    content_key: item.contentKey,
+    title: item.title,
+    category: item.categoryKey,
+    source_url: item.url,
+    poster_url: item.posterUrl,
+  };
 }
+
+export { addFavorite, removeFavorite };

@@ -14,8 +14,8 @@ from fastapi.security import HTTPAuthorizationCredentials
 
 from database import get_connection, init_db
 from routes.auth import login, register
-from routes.users import current_user_id, get_history, register_watch
-from schemas import LoginRequest, RegisterRequest, WatchRequest
+from routes.users import add_favorite, current_user_id, get_favorites, get_history, register_watch, remove_favorite
+from schemas import FavoriteRequest, LoginRequest, RegisterRequest, WatchRequest
 
 
 class ApiTests(unittest.TestCase):
@@ -23,6 +23,7 @@ class ApiTests(unittest.TestCase):
         init_db()
         with get_connection() as connection:
             connection.execute("DELETE FROM watch_history")
+            connection.execute("DELETE FROM favorites")
             connection.execute("DELETE FROM users")
 
     def test_register_login_and_history(self) -> None:
@@ -57,9 +58,36 @@ class ApiTests(unittest.TestCase):
         second = register_watch(
             WatchRequest(title="Filme", category="Drama", source_url="https://example.com/movie"), user_id
         )
+        progress = register_watch(
+            WatchRequest(
+                title="Filme",
+                category="Drama",
+                source_url="https://example.com/movie",
+                position_seconds=120,
+                duration_seconds=600,
+                count_view=False,
+            ),
+            user_id,
+        )
         self.assertEqual(first.view_count, 1)
         self.assertEqual(second.view_count, 2)
+        self.assertEqual(progress.view_count, 2)
+        self.assertEqual(progress.position_seconds, 120)
         self.assertEqual(len(get_history(user_id)), 1)
+
+        favorite = add_favorite(
+            FavoriteRequest(
+                title="Filme",
+                category="Drama",
+                source_url="https://example.com/movie",
+                content_key="movie-1",
+            ),
+            user_id,
+        )
+        self.assertEqual(favorite.content_key, "movie-1")
+        self.assertEqual(len(get_favorites(user_id)), 1)
+        remove_favorite("movie-1", user_id)
+        self.assertEqual(get_favorites(user_id), [])
 
     def test_invalid_token_is_rejected(self) -> None:
         with self.assertRaises(HTTPException) as invalid_token:

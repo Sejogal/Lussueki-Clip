@@ -61,6 +61,7 @@ class WatchRequest(BaseModel):
     # a cada 10-15s) e ao pausar/sair do player.
     position_seconds: int = Field(default=0, ge=0)
     duration_seconds: int | None = Field(default=None, ge=1)
+    count_view: bool = True
 
     @field_validator("title", "source_url", "category", "content_key")
     @classmethod
@@ -86,3 +87,20 @@ class WatchResponse(BaseModel):
 
 class HistoryResponse(WatchResponse):
     id: int
+
+
+class FavoriteRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    source_url: str = Field(min_length=1, max_length=2000)
+    category: str | None = Field(default=None, max_length=80)
+    poster_url: str | None = Field(default=None, max_length=2000)
+    content_key: str | None = Field(default=None, max_length=300)
+
+
+class FavoriteResponse(BaseModel):
+    content_key: str
+    title: str
+    category: str | None
+    source_url: str
+    poster_url: str | None
+    added_at: str
