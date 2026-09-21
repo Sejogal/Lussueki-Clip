@@ -16,6 +16,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import styles from '../assets/styles/player';
 
 const { width, height } = Dimensions.get('window');
 
@@ -189,6 +190,15 @@ export default function PlayerScreen() {
   // sobrescrever o estado com informação desatualizada.
   const resolveTokenRef = useRef(0);
 
+  // "Continuar assistindo" só nos dá a URL da playlist do título (não a
+  // do episódio específico) mais o título do episódio e a posição salvos
+  // no histórico. Quando essa playlist resolve pra mais de um item,
+  // tentamos casar o título salvo com um dos itens — uma única vez — pra
+  // pular direto pro episódio certo em vez de parar no seletor. Fica
+  // "armado" só quando chegamos aqui com uma posição salva (resumePosition
+  // > 0), que é o sinal de que viemos do histórico.
+  const pendingResumeMatchRef = useRef(resumePosition > 0);
+
   const resolveSource = useCallback(async (url: string, label: string, pushCurrentToStack: boolean) => {
     const token = ++resolveTokenRef.current;
     setResolving(true);
@@ -235,6 +245,23 @@ export default function PlayerScreen() {
         return;
       }
 
+      // Veio de "Continuar assistindo" (resumePosition > 0) e ainda não
+      // tentamos casar o episódio salvo com esta lista? Procura pelo
+      // título exato antes de cair no seletor manual.
+      if (pendingResumeMatchRef.current) {
+        pendingResumeMatchRef.current = false; // só tenta uma vez
+        const normalizedTarget = (paramTitle || '').trim().toLowerCase();
+        const match = normalizedTarget
+          ? entries.find((entry) => (entry.title || '').trim().toLowerCase() === normalizedTarget)
+          : undefined;
+        if (match) {
+          console.log(`⏩ Retomando episódio salvo: "${match.title}"`);
+          await resolveSource(match.url, match.title || label, pushCurrentToStack);
+          return;
+        }
+        console.log('⏩ Não foi possível casar o episódio salvo com nenhum item da lista, mostrando seletor.');
+      }
+
       // Vários itens: mostra o seletor. Se estamos navegando mais fundo
       // (usuário tocou em um item de uma lista anterior), empilha a
       // lista atual pra o botão "Voltar" conseguir subir um nível.
@@ -252,7 +279,7 @@ export default function PlayerScreen() {
       setLoading(false);
       setResolving(false);
     }
-  }, []);
+  }, [paramTitle]);
 
   // Dispara a resolução inicial quando a tela recebe a URL.
   useEffect(() => {
@@ -308,24 +335,49 @@ export default function PlayerScreen() {
   // Salva snapshots periódicos para que a retomada funcione em outro aparelho.
   // O primeiro registro, feito quando o player fica pronto, conta uma visualização;
   // os snapshots seguintes apenas atualizam a posição.
+  // Guarda a última posição/duração lidas com sucesso. Necessário porque,
+  // no unmount, o player nativo (useVideoPlayer) pode já ter sido liberado
+  // ANTES deste efeito rodar seu cleanup — não há garantia de ordem entre
+  // os cleanups de hooks diferentes. Ler player.currentTime nesse momento
+  // lança "Cannot use shared object that was already released". Por isso
+  // guardamos o último valor bom numa ref e, no cleanup, só tentamos uma
+  // leitura fresca dentro de um try/catch, caindo pra ref se o player já
+  // tiver sido destruído.
+  const lastKnownProgressRef = useRef<{ position: number; duration?: number } | null>(null);
+
   useEffect(() => {
     if (!selectedEpisode || !streamUrl) return;
+
+    const readProgress = (): { position: number; duration?: number } | null => {
+      try {
+        const position = Math.max(0, Math.floor(player.currentTime || 0));
+        const duration = Number.isFinite(player.duration) && player.duration > 0
+          ? Math.floor(player.duration)
+          : undefined;
+        const result = { position, duration };
+        lastKnownProgressRef.current = result;
+        return result;
+      } catch (err) {
+        // Player já liberado (ex.: durante unmount) — usa o último valor conhecido.
+        console.warn('Player indisponível ao ler progresso, usando último valor conhecido:', err);
+        return lastKnownProgressRef.current;
+      }
+    };
+
     const saveProgress = () => {
-      const position = Math.max(0, Math.floor(player.currentTime || 0));
-      const duration = Number.isFinite(player.duration) && player.duration > 0
-        ? Math.floor(player.duration)
-        : undefined;
-      if (position <= 0) return;
+      const progress = readProgress();
+      if (!progress || progress.position <= 0) return;
       void recordWatchRef.current({
         title: selectedEpisode.title || paramTitle || 'Reproduzindo...',
         category: paramCategoryKey,
         source_url: streamUrl,
         content_key: getContentKey(streamUrl, selectedEpisode.title),
-        position_seconds: position,
-        duration_seconds: duration,
+        position_seconds: progress.position,
+        duration_seconds: progress.duration,
         count_view: false,
       }).catch((error) => console.warn('Não foi possível salvar o progresso:', error));
     };
+
     const interval = setInterval(saveProgress, 15000);
     return () => {
       clearInterval(interval);
@@ -647,131 +699,3 @@ export default function PlayerScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  centerContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  video: { width, height: height * 0.85, alignSelf: 'center' },
-  backButton: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    padding: 10,
-    paddingHorizontal: 15,
-    borderRadius: 8,
-    zIndex: 10,
-  },
-  backButtonInline: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    padding: 10,
-    paddingHorizontal: 15,
-    borderRadius: 8,
-  },
-  errorButtonRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  retryButton: {
-    backgroundColor: 'rgba(229,9,20,0.85)',
-    padding: 10,
-    paddingHorizontal: 15,
-    borderRadius: 8,
-  },
-  episodesButton: {
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    padding: 10,
-    paddingHorizontal: 15,
-    borderRadius: 8,
-  },
-  topRightStack: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    zIndex: 10,
-  },
-  backText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  loadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.9)',
-    zIndex: 5,
-  },
-  loadingText: { color: '#fff', marginTop: 10, fontSize: 14 },
-  errorText: { color: '#ff6b6b', fontSize: 16, textAlign: 'center', marginBottom: 20 },
-  titleContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 10,
-  },
-  titleText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  episodeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 50,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 12,
-  },
-  episodeHeaderTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-    flex: 1,
-  },
-  inlineResolving: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 8,
-  },
-  inlineResolvingText: {
-    color: '#8e8e93',
-    fontSize: 13,
-  },
-  episodeList: {
-    paddingHorizontal: 16,
-    paddingBottom: 24,
-  },
-  episodeItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 10,
-  },
-  episodeIndexBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  episodeIndexText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  episodeThumb: {
-    width: 46,
-    height: 66,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    marginRight: 12,
-  },
-  episodeItemText: { color: '#fff', fontSize: 15, flex: 1 },
-});
