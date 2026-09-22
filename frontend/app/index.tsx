@@ -158,7 +158,7 @@ export default function HomeScreen() {
     // 'public-domain-header'
     return (
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionHeaderTitle}>📚 Domínio Público</Text>
+        <Text style={styles.sectionHeaderTitle}> Domínio Público</Text>
         <Text style={styles.sectionHeaderSubtitle}>
           Filmes e curtas do archive.org sem direitos autorais vigentes
         </Text>

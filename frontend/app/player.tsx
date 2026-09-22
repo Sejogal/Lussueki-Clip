@@ -57,10 +57,6 @@ const EpisodeItem = React.memo(function EpisodeItem({ item, index, onPress }: Ep
   );
 });
 
-// Códigos HTTP que geralmente são transitórios (servidor sobrecarregado,
-// manutenção, rate limiting) — vale a pena tentar de novo automaticamente.
-const RETRYABLE_HTTP_CODES = ['502', '503', '504'];
-
 // Erros de REDE (não código HTTP — a conexão nem chegou a receber uma
 // resposta) que também costumam ser transitórios: timeout, conexão
 // recusada momentaneamente, etc. Reconhecidos pelo nome da exceção do
@@ -73,6 +69,14 @@ const RETRYABLE_NETWORK_PATTERNS = [
   /connection reset/i,
 ];
 
+// Janela de retentativa automática do player: ao encontrar QUALQUER erro na
+// hora de carregar/reproduzir o stream (incluindo bloqueios momentâneos como
+// 403/CLEARTEXT ou timeouts), tentamos de novo sozinhos por cerca de 1
+// minuto, com backoff progressivo, antes de finalmente mostrar a tela de
+// erro pro usuário. A ideia é que instabilidades passageiras de rede/CDN se
+// resolvam sozinhas sem o usuário nem perceber que algo falhou.
+const RETRY_DELAYS_MS = [2000, 3000, 5000, 8000, 12000, 15000, 15000]; // soma ≈ 60s
+
 function getHttpCodeFromError(message: string): string | null {
   const match = message.match(/response code:\s*(\d{3})/i);
   return match ? match[1] : null;
@@ -80,12 +84,6 @@ function getHttpCodeFromError(message: string): string | null {
 
 function isTimeoutOrNetworkError(message: string): boolean {
   return RETRYABLE_NETWORK_PATTERNS.some((pattern) => pattern.test(message));
-}
-
-function isRetryableError(message: string): boolean {
-  const code = getHttpCodeFromError(message);
-  if (code !== null) return RETRYABLE_HTTP_CODES.includes(code);
-  return isTimeoutOrNetworkError(message);
 }
 
 function getFriendlyErrorMessage(message: string): string {
@@ -165,6 +163,10 @@ export default function PlayerScreen() {
   const [loading, setLoading] = useState(true);
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Número da tentativa de retry em andamento (0 = nenhuma). Só usado pra
+  // mostrar um texto discreto de "Reconectando..." na tela de loading em
+  // vez de pular direto pra tela de erro.
+  const [retryAttempt, setRetryAttempt] = useState(0);
   const playerRef = useRef<VideoPlayer | null>(null);
 
   // ── Resolução recursiva de playlists ─────────────────────────────────
@@ -408,9 +410,11 @@ export default function PlayerScreen() {
       console.log('📡 Status do player:', status, statusError ?? '');
 
       if (status === 'readyToPlay') {
+        clearWatchdog();
         setLoading(false);
         setError(null);
         retryCountRef.current = 0;
+        setRetryAttempt(0);
         const episode = selectedEpisodeRef.current;
         if (episode && streamUrl) {
           const contentKey = getContentKey(streamUrl, episode.title);
@@ -428,21 +432,11 @@ export default function PlayerScreen() {
           }
         }
       } else if (status === 'error') {
+        clearWatchdog();
         const rawMessage = statusError?.message ?? 'formato não suportado ou servidor recusou a conexão';
+        const episode = selectedEpisodeRef.current;
 
-        // Servidores pequenos/instáveis como esses costumam precisar de
-        // mais de uma tentativa — 2 tentativas com backoff progressivo
-        // (1.5s, depois 3.5s) tanto pra erros HTTP (5xx) quanto timeout.
-        const maxRetries = 2;
-
-        if (isRetryableError(rawMessage) && retryCountRef.current < maxRetries) {
-          retryCountRef.current += 1;
-          const delay = retryCountRef.current === 1 ? 1500 : 3500;
-          console.log(`🔁 Erro transitório detectado (tentativa ${retryCountRef.current}/${maxRetries}), tentando novamente em ${delay}ms...`);
-          setTimeout(() => {
-            const episode = selectedEpisodeRef.current;
-            if (episode) attemptPlaybackRef.current?.(episode);
-          }, delay);
+        if (episode && scheduleRetry(episode)) {
           return;
         }
 
@@ -456,20 +450,88 @@ export default function PlayerScreen() {
     };
   }, [paramCategoryKey, paramTitle, player, streamUrl]);
 
-  // Contador de tentativas automáticas para erros transitórios do
-  // servidor (5xx) — reseta toda vez que um episódio novo é selecionado.
+  // Contador de tentativas automáticas (qualquer tipo de erro de
+  // reprodução) — reseta toda vez que um episódio novo é selecionado ou
+  // um retry manual é feito. Vai de 0 até RETRY_DELAYS_MS.length.
   const retryCountRef = useRef(0);
+
+  // Timer do "watchdog": se o stream simplesmente não responder nada (nem
+  // readyToPlay nem error) dentro de 20s de uma tentativa, tratamos como
+  // timeout e entramos no mesmo fluxo de retry — em vez de mostrar erro
+  // direto, como acontecia antes.
+  const watchdogTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearWatchdog = () => {
+    if (watchdogTimerRef.current) {
+      clearTimeout(watchdogTimerRef.current);
+      watchdogTimerRef.current = null;
+    }
+  };
+
+  // Agenda uma nova tentativa automática pro episódio dado, respeitando a
+  // janela de ~60s (RETRY_DELAYS_MS). Retorna true se agendou (chamador
+  // deve esperar, sem mostrar erro), false se as tentativas se esgotaram
+  // (chamador deve mostrar o erro final).
+  const scheduleRetry = (episode: Episode): boolean => {
+    if (retryCountRef.current >= RETRY_DELAYS_MS.length) {
+      return false;
+    }
+    const delay = RETRY_DELAYS_MS[retryCountRef.current];
+    retryCountRef.current += 1;
+    setRetryAttempt(retryCountRef.current);
+    console.log(`🔁 Erro ao carregar o stream (tentativa ${retryCountRef.current}/${RETRY_DELAYS_MS.length}), tentando novamente em ${delay}ms...`);
+    setTimeout(() => {
+      if (selectedEpisodeRef.current === episode) {
+        attemptPlaybackRef.current?.(episode);
+      }
+    }, delay);
+    return true;
+  };
+
+  const armWatchdog = (episode: Episode) => {
+    clearWatchdog();
+    watchdogTimerRef.current = setTimeout(() => {
+      if (selectedEpisodeRef.current !== episode) return;
+      console.log('⏱️ Stream não respondeu em 20s, tratando como timeout...');
+      if (scheduleRetry(episode)) return;
+      setError(
+        'O stream não respondeu a tempo. O formato pode não ser compatível (ex: TS bruto em vez de HLS/m3u8), ou o servidor pode estar bloqueando a conexão.'
+      );
+      setLoading(false);
+    }, 20000);
+  };
+
+  // Garante que nenhum watchdog fique pendente depois que a tela é
+  // desmontada (evita setState em componente já desmontado).
+  useEffect(() => {
+    return () => clearWatchdog();
+  }, []);
 
   // Função reutilizável de "tentar tocar este episódio agora", usada
   // tanto pela troca normal de fonte quanto pelo retry automático/manual.
   const attemptPlayback = async (episode: Episode) => {
     setLoading(true);
     setError(null);
+    armWatchdog(episode);
     try {
       console.log('▶️ Trocando fonte e iniciando reprodução:', episode.url);
+
+      // Alguns servidores de vídeo bloqueiam requisições sem um Referer
+      // que bata com o próprio domínio deles (proteção contra hotlink) —
+      // isso costuma aparecer como erro 403. Mandamos o Referer baseado
+      // no próprio host do vídeo como tentativa genérica de contornar.
+      let referer: string | undefined;
+      try {
+        referer = `${new URL(episode.url).origin}/`;
+      } catch {
+        referer = undefined;
+      }
+
       await player.replaceAsync({
         uri: episode.url,
-        headers: { 'User-Agent': USER_AGENT },
+        headers: {
+          'User-Agent': USER_AGENT,
+          ...(referer ? { Referer: referer } : {}),
+        },
       });
       if (resumePosition > 0 && episode === selectedEpisode) {
         player.currentTime = resumePosition;
@@ -479,17 +541,20 @@ export default function PlayerScreen() {
       // statusChange abaixo, que reflete o estado real do player.
     } catch (err) {
       console.error('❌ Erro ao reproduzir:', err);
+      clearWatchdog();
+      if (scheduleRetry(episode)) return;
       setError('Erro ao reproduzir: ' + String(err));
       setLoading(false);
     }
   };
   attemptPlaybackRef.current = attemptPlayback;
 
-  // Retry manual: reseta o contador (pra permitir novo auto-retry também)
-  // e tenta tocar o episódio atual de novo do zero.
+  // Retry manual: reseta o contador (pra permitir uma nova janela de
+  // ~60s de auto-retry também) e tenta tocar o episódio atual de novo.
   const handleManualRetry = () => {
     if (!selectedEpisode) return;
     retryCountRef.current = 0;
+    setRetryAttempt(0);
     attemptPlayback(selectedEpisode);
   };
 
@@ -498,6 +563,7 @@ export default function PlayerScreen() {
   useEffect(() => {
     if (!player || !selectedEpisode) return;
     retryCountRef.current = 0;
+    setRetryAttempt(0);
 
     let cancelled = false;
     (async () => {
@@ -509,28 +575,6 @@ export default function PlayerScreen() {
       cancelled = true;
     };
   }, [player, resumePosition, selectedEpisode]);
-
-  // Timeout de segurança: se depois de 20s o status nunca mudou (nem
-  // readyToPlay nem error), avisamos o usuário em vez de deixar o loading
-  // girando pra sempre — geralmente indica que o servidor aceitou a conexão
-  // mas está entregando um formato/stream que o player não consegue decodificar.
-  const loadingRef = useRef(loading);
-  useEffect(() => {
-    loadingRef.current = loading;
-  }, [loading]);
-
-  useEffect(() => {
-    if (!selectedEpisode) return;
-    const timeout = setTimeout(() => {
-      if (loadingRef.current) {
-        setError(
-          'O stream não respondeu a tempo. O formato pode não ser compatível (ex: TS bruto em vez de HLS/m3u8), ou o servidor pode estar bloqueando a conexão.'
-        );
-        setLoading(false);
-      }
-    }, 20000);
-    return () => clearTimeout(timeout);
-  }, [selectedEpisode]);
 
   const handleEpisodePress = useCallback(
     (item: Episode) => {
@@ -647,7 +691,11 @@ export default function PlayerScreen() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#fff" />
           <Text style={styles.loadingText}>
-            {resolving ? 'Lendo playlist...' : 'Carregando vídeo...'}
+            {resolving
+              ? 'Lendo playlist...'
+              : retryAttempt > 0
+                ? `Reconectando... (tentativa ${retryAttempt}/${RETRY_DELAYS_MS.length})`
+                : 'Carregando vídeo...'}
           </Text>
         </View>
       )}
@@ -698,4 +746,3 @@ export default function PlayerScreen() {
     </View>
   );
 }
-
