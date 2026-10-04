@@ -160,7 +160,7 @@ export default function HomeScreen() {
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionHeaderTitle}> Domínio Público</Text>
         <Text style={styles.sectionHeaderSubtitle}>
-          Filmes e curtas do archive.org sem direitos autorais vigentes
+          Filmes e curtas do archive.org
         </Text>
       </View>
     );
@@ -177,6 +177,14 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Lussueki <Text style={{color:'red'}} >Clip</Text></Text>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Abrir definições"
+          style={styles.settingsButton}
+          onPress={() => router.push('/settings')}
+        >
+          <Ionicons name="settings-outline" size={21} color="#f2f2f4" />
+        </TouchableOpacity>
       </View>
 
       {/* Barra de pesquisa */}
@@ -262,6 +270,16 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
     color: '#fff',
+  },
+  settingsButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+    backgroundColor: '#19191c',
+    borderWidth: 1,
+    borderColor: '#303034',
   },
   searchContainer: {
     flexDirection: 'row',

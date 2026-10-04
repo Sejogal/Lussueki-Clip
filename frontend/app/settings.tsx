@@ -1,0 +1,100 @@
+import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { Alert, Linking, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+const PORTFOLIO_URL = 'https://portfolio-m7sj.onrender.com/';
+
+export default function SettingsScreen() {
+  const router = useRouter();
+
+  const openPortfolio = async () => {
+    try {
+      await Linking.openURL(PORTFOLIO_URL);
+    } catch {
+      Alert.alert('Não foi possível abrir o portfólio', 'Verifique sua conexão e tente novamente.');
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Voltar"
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={21} color="#fff" />
+        </TouchableOpacity>
+        <View style={styles.headerText}>
+          <Text style={styles.title}>Definições</Text>
+          <Text style={styles.subtitle}>Sobre o aplicativo</Text>
+        </View>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Text style={styles.sectionEyebrow}>LUSSUEKI CLIP</Text>
+        <Text style={styles.introTitle}>Entretenimento em um só lugar.</Text>
+        <Text style={styles.introText}>
+          Um projeto independente para reunir filmes, séries, animes e canais ao vivo em uma experiência simples de explorar.
+        </Text>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Sobre o desenvolvedor</Text>
+          <View style={styles.developerPanel}>
+            <View style={styles.developerIcon}>
+              <Ionicons name="code-slash-outline" size={21} color="#ff777d" />
+            </View>
+            <Text style={styles.developerTitle}>Conheça meu trabalho</Text>
+            <Text style={styles.developerDescription}>
+              Veja outros projetos, experiências e criações no meu portfólio.
+            </Text>
+            <TouchableOpacity
+              accessibilityRole="link"
+              style={styles.portfolioButton}
+              onPress={() => void openPortfolio()}
+            >
+              <Text style={styles.portfolioButtonText}>Visitar portfólio</Text>
+              <Ionicons name="open-outline" size={17} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.versionRow}>
+          <View style={styles.versionIcon}>
+            <Ionicons name="information-circle-outline" size={19} color="#a1a1a8" />
+          </View>
+          <Text style={styles.versionLabel}>Versão do aplicativo</Text>
+          <Text style={styles.versionValue}>{Constants.expoConfig?.version ?? '1.0.0'}</Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#09090b' },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#2a2a2e' },
+  backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: '#19191c' },
+  headerText: { marginLeft: 13 },
+  title: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  subtitle: { color: '#96969d', fontSize: 12, marginTop: 2 },
+  content: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 36 },
+  sectionEyebrow: { color: '#ff777d', fontSize: 11, fontWeight: '800', marginBottom: 9 },
+  introTitle: { color: '#fff', fontSize: 25, lineHeight: 31, fontWeight: '800', maxWidth: 320 },
+  introText: { color: '#a1a1a8', fontSize: 14, lineHeight: 21, marginTop: 10 },
+  section: { marginTop: 32 },
+  sectionTitle: { color: '#f4f4f5', fontSize: 16, fontWeight: '700', marginBottom: 12 },
+  developerPanel: { backgroundColor: '#151517', borderWidth: 1, borderColor: '#2a2a2e', borderRadius: 10, padding: 17 },
+  developerIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: '#302023', marginBottom: 14 },
+  developerTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  developerDescription: { color: '#a1a1a8', fontSize: 13, lineHeight: 19, marginTop: 6 },
+  portfolioButton: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, backgroundColor: '#d91620', borderRadius: 7, marginTop: 17, paddingHorizontal: 14 },
+  portfolioButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  versionRow: { flexDirection: 'row', alignItems: 'center', minHeight: 55, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#2a2a2e', marginTop: 24 },
+  versionIcon: { width: 30, alignItems: 'flex-start' },
+  versionLabel: { flex: 1, color: '#d8d8db', fontSize: 13 },
+  versionValue: { color: '#96969d', fontSize: 13 },
+});

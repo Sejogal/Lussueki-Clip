@@ -21,6 +21,11 @@ export type PlaylistEntry = {
 };
 
 const USER_AGENT = 'VLC/3.0.18 LibVLC/3.0.18';
+const UNROUTABLE_HOSTS = new Set(['0.0.0.0', '127.0.0.1', 'localhost', '[::1]']);
+
+function isUsableHttpUrl(url: URL): boolean {
+  return (url.protocol === 'http:' || url.protocol === 'https:') && !UNROUTABLE_HOSTS.has(url.hostname.toLowerCase());
+}
 
 // Entradas promocionais que aparecem misturadas nas playlists reais
 // (ex: "---WitFlixBr---" apontando pro loop de propaganda) — filtramos
@@ -75,6 +80,11 @@ export function parseExtendedM3u(text: string, baseUrl: string): PlaylistEntry[]
 
     try {
       const resolvedUrl = new URL(line, baseUrl).toString();
+      if (!isUsableHttpUrl(new URL(resolvedUrl))) {
+        pendingTitle = null;
+        pendingPoster = undefined;
+        continue;
+      }
       const fallbackName = decodeURIComponent(resolvedUrl.split('/').pop() || '');
       const title = pendingTitle || fallbackName || `Item ${entries.length + 1}`;
 

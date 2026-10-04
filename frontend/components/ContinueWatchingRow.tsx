@@ -15,7 +15,7 @@ export default function ContinueWatchingRow() {
         streamUrl: item.source_url,
         title: item.title,
         categoryKey: item.category ?? '',
-        positionSeconds: String(item.position_seconds),
+        positionSeconds: String(item.position_seconds ?? 0),
       },
     });
   }, [router]);
@@ -35,7 +35,7 @@ export default function ContinueWatchingRow() {
           <TouchableOpacity style={styles.item} onPress={() => openItem(item)}>
             <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
             <Text style={styles.progress}>
-              {item.duration_seconds ? `${Math.round((item.position_seconds / item.duration_seconds) * 100)}% assistido` : 'Retomar'}
+              {item.duration_seconds ? `${Math.round(((item.position_seconds ?? 0) / item.duration_seconds) * 100)}% assistido` : 'Retomar'}
             </Text>
           </TouchableOpacity>
         )}

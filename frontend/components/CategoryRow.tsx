@@ -128,6 +128,14 @@ function CategoryRow({ categoryKey, config }: Props) {
       <View style={styles.header}>
         <Text style={styles.icon}>{config.icon}</Text>
         <Text style={styles.title}>{config.label}</Text>
+        <TouchableOpacity
+          accessibilityRole="button"
+          style={styles.seeMoreButton}
+          onPress={() => router.push({ pathname: '/category/[category]', params: { category: categoryKey } })}
+        >
+          <Text style={styles.seeMoreText}>Ver mais</Text>
+          <Text style={styles.seeMoreChevron}>›</Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -171,6 +179,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 10,
     gap: 8,
+  },
+  seeMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingVertical: 4,
+    paddingLeft: 8,
+  },
+  seeMoreText: {
+    color: '#ff777d',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  seeMoreChevron: {
+    color: '#ff777d',
+    fontSize: 20,
+    lineHeight: 20,
   },
   icon: {
     fontSize: 16,

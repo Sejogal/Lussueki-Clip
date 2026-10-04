@@ -147,6 +147,14 @@ export async function getHistory(accessToken: string): Promise<HistoryItem[]> {
   return authenticatedRequest<HistoryItem[]>(accessToken, '/users/me/continue-watching');
 }
 
+export async function getProfile(accessToken: string): Promise<AuthUser> {
+  return authenticatedRequest<AuthUser>(accessToken, '/users/me');
+}
+
+export async function getWatchHistory(accessToken: string): Promise<HistoryItem[]> {
+  return authenticatedRequest<HistoryItem[]>(accessToken, '/users/me/history');
+}
+
 export async function getFavorites(accessToken: string): Promise<FavoriteResponse[]> {
   return authenticatedRequest<FavoriteResponse[]>(accessToken, '/users/me/favorites');
 }

@@ -5,7 +5,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-type MainRoute = 'home' | 'categories' | 'iptv' | 'favoritos';
+type MainRoute = 'home' | 'categories' | 'iptv' | 'favoritos' | 'account';
 
 type NavItemProps = {
   active: boolean;
@@ -28,13 +28,21 @@ export default function MainBottomNav({ active }: { active: MainRoute }) {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
 
+  const openLiveTv = () => {
+    if (!session) {
+      router.push({ pathname: '/auth', params: { redirect: '/iptv' } });
+      return;
+    }
+    router.replace('/iptv' as Href);
+  };
+
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-      <NavItem active={active === 'home'} icon="home-outline" label="Home" onPress={() => router.replace('/')} />
+      <NavItem active={active === 'home'} icon="home-outline" label="Início" onPress={() => router.replace('/')} />
       <NavItem active={active === 'categories'} icon="grid-outline" label="Categorias" onPress={() => router.replace('/categories' as Href)} />
-      <NavItem active={active === 'iptv'} icon="tv-outline" label="TV ao vivo" onPress={() => router.replace('/iptv' as Href)} />
+      <NavItem active={active === 'iptv'} icon="tv-outline" label="TV ao vivo" onPress={openLiveTv} />
       <NavItem active={active === 'favoritos'} icon="heart" label="Favoritos" onPress={() => router.replace('/favoritos' as Href)} />
-      <NavItem active={false} icon="person-outline" label={session ? 'Conta' : 'Entrar'} onPress={() => router.push('/auth' as Href)} />
+      <NavItem active={active === 'account'} icon="person-outline" label={session ? 'Conta' : 'Entrar'} onPress={() => router.push('/auth' as Href)} />
     </View>
   );
 }

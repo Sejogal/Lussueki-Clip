@@ -1,6 +1,7 @@
 // app/iptv/index.tsx
 import ChannelRow from '@/components/ChannelRow';
 import MainBottomNav from '@/components/MainBottomNav';
+import { useAuth } from '@/contexts/AuthContext';
 import { fetchIptvCatalog } from '@/services/iptv';
 import { IptvCategory, IptvChannel } from '@/utils/iptv';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import {
 
 export default function IptvScreen() {
   const router = useRouter();
+  const { session, isLoading: authLoading } = useAuth();
   const [categories, setCategories] = useState<IptvCategory[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,8 +42,13 @@ export default function IptvScreen() {
   }, []);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!session) {
+      router.replace({ pathname: '/auth', params: { redirect: '/iptv' } });
+      return;
+    }
     load();
-  }, [load]);
+  }, [authLoading, load, router, session]);
 
   const handleChannelPress = useCallback(
     (channel: IptvChannel) => {
@@ -103,6 +110,14 @@ export default function IptvScreen() {
   );
 
   const isSearchMode = searchQuery.trim().length >= 2;
+
+  if (authLoading || !session) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#e50914" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

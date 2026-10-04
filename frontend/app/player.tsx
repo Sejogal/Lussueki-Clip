@@ -86,6 +86,15 @@ function isTimeoutOrNetworkError(message: string): boolean {
   return RETRYABLE_NETWORK_PATTERNS.some((pattern) => pattern.test(message));
 }
 
+function isPlaylistNetworkError(error: unknown): boolean {
+  const message = String(error);
+  return /network request failed|failed to fetch|networkerror/i.test(message) || isTimeoutOrNetworkError(message);
+}
+
+function isReleasedPlayerError(error: unknown): boolean {
+  return /shared object that was already released|cannot use shared object/i.test(String(error));
+}
+
 function getFriendlyErrorMessage(message: string): string {
   const code = getHttpCodeFromError(message);
   if (code === '503') {
@@ -168,6 +177,9 @@ export default function PlayerScreen() {
   // vez de pular direto pra tela de erro.
   const [retryAttempt, setRetryAttempt] = useState(0);
   const playerRef = useRef<VideoPlayer | null>(null);
+  const isMountedRef = useRef(false);
+  const playbackAttemptRef = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Resolução recursiva de playlists ─────────────────────────────────
   // A hierarquia aqui pode ter MAIS DE UM NÍVEL: uma categoria aponta pra
@@ -191,6 +203,7 @@ export default function PlayerScreen() {
   // depois de uma mais nova ter começado, ela se auto-cancela em vez de
   // sobrescrever o estado com informação desatualizada.
   const resolveTokenRef = useRef(0);
+  const failedResolutionRef = useRef<{ url: string; label: string; pushCurrentToStack: boolean } | null>(null);
 
   // "Continuar assistindo" só nos dá a URL da playlist do título (não a
   // do episódio específico) mais o título do episódio e a posição salvos
@@ -203,6 +216,7 @@ export default function PlayerScreen() {
 
   const resolveSource = useCallback(async (url: string, label: string, pushCurrentToStack: boolean) => {
     const token = ++resolveTokenRef.current;
+    failedResolutionRef.current = { url, label, pushCurrentToStack };
     setResolving(true);
     setError(null);
 
@@ -225,6 +239,7 @@ export default function PlayerScreen() {
 
       if (isDirectMediaUrl(url)) {
         if (token !== resolveTokenRef.current) return;
+        failedResolutionRef.current = null;
         setSelectedEpisode({ title: label, url });
         setResolving(false);
         return;
@@ -271,13 +286,19 @@ export default function PlayerScreen() {
         setListStack((stack) => [...stack, currentListRef.current!]);
       }
       setCurrentList({ title: label, entries });
+      failedResolutionRef.current = null;
       setSelectedEpisode(null);
       setLoading(false);
       setResolving(false);
     } catch (err) {
       if (token !== resolveTokenRef.current) return;
-      console.error('❌ Erro ao resolver playlist:', err);
-      setError('Erro ao ler a playlist: ' + String(err));
+      if (isPlaylistNetworkError(err)) {
+        console.warn('Não foi possível conectar à fonte desta lista.');
+        setError('Não foi possível conectar à fonte do conteúdo. Verifique sua conexão e tente novamente.');
+      } else {
+        console.error('❌ Erro ao resolver playlist:', err);
+        setError('Erro ao ler a playlist: ' + String(err));
+      }
       setLoading(false);
       setResolving(false);
     }
@@ -308,6 +329,22 @@ export default function PlayerScreen() {
   const player = useVideoPlayer('', (playerInstance) => {
     playerRef.current = playerInstance;
   });
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      playbackAttemptRef.current += 1;
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+      if (watchdogTimerRef.current) {
+        clearTimeout(watchdogTimerRef.current);
+        watchdogTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Validação de URL ausente, feita como efeito (não durante o render)
   useEffect(() => {
@@ -361,7 +398,9 @@ export default function PlayerScreen() {
         return result;
       } catch (err) {
         // Player já liberado (ex.: durante unmount) — usa o último valor conhecido.
-        console.warn('Player indisponível ao ler progresso, usando último valor conhecido:', err);
+        if (!isReleasedPlayerError(err)) {
+          console.warn('Player indisponível ao ler progresso, usando último valor conhecido:', err);
+        }
         return lastKnownProgressRef.current;
       }
     };
@@ -398,6 +437,8 @@ export default function PlayerScreen() {
     if (!player) return;
 
     const subscription = player.addListener('statusChange', ({ status, error: statusError }) => {
+      if (!isMountedRef.current) return;
+
       // O player é criado com uma fonte vazia antes de qualquer episódio
       // ser escolhido (necessário porque o Hook não pode ser condicional).
       // Isso dispara um "error" espúrio (ENOENT) que não tem relação com
@@ -472,15 +513,17 @@ export default function PlayerScreen() {
   // deve esperar, sem mostrar erro), false se as tentativas se esgotaram
   // (chamador deve mostrar o erro final).
   const scheduleRetry = (episode: Episode): boolean => {
-    if (retryCountRef.current >= RETRY_DELAYS_MS.length) {
+    if (!isMountedRef.current || retryCountRef.current >= RETRY_DELAYS_MS.length) {
       return false;
     }
     const delay = RETRY_DELAYS_MS[retryCountRef.current];
     retryCountRef.current += 1;
     setRetryAttempt(retryCountRef.current);
     console.log(`🔁 Erro ao carregar o stream (tentativa ${retryCountRef.current}/${RETRY_DELAYS_MS.length}), tentando novamente em ${delay}ms...`);
-    setTimeout(() => {
-      if (selectedEpisodeRef.current === episode) {
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    retryTimerRef.current = setTimeout(() => {
+      retryTimerRef.current = null;
+      if (isMountedRef.current && selectedEpisodeRef.current === episode) {
         attemptPlaybackRef.current?.(episode);
       }
     }, delay);
@@ -490,7 +533,7 @@ export default function PlayerScreen() {
   const armWatchdog = (episode: Episode) => {
     clearWatchdog();
     watchdogTimerRef.current = setTimeout(() => {
-      if (selectedEpisodeRef.current !== episode) return;
+      if (!isMountedRef.current || selectedEpisodeRef.current !== episode) return;
       console.log('⏱️ Stream não respondeu em 20s, tratando como timeout...');
       if (scheduleRetry(episode)) return;
       setError(
@@ -509,6 +552,13 @@ export default function PlayerScreen() {
   // Função reutilizável de "tentar tocar este episódio agora", usada
   // tanto pela troca normal de fonte quanto pelo retry automático/manual.
   const attemptPlayback = async (episode: Episode) => {
+    const attemptId = ++playbackAttemptRef.current;
+    const isCurrentAttempt = () =>
+      isMountedRef.current &&
+      playbackAttemptRef.current === attemptId &&
+      selectedEpisodeRef.current === episode;
+
+    if (!isCurrentAttempt()) return;
     setLoading(true);
     setError(null);
     armWatchdog(episode);
@@ -533,15 +583,22 @@ export default function PlayerScreen() {
           ...(referer ? { Referer: referer } : {}),
         },
       });
-      if (resumePosition > 0 && episode === selectedEpisode) {
+      if (!isCurrentAttempt()) return;
+      if (resumePosition > 0) {
         player.currentTime = resumePosition;
       }
       await player.play();
       // Não zeramos loading/error aqui: quem faz isso é o listener de
       // statusChange abaixo, que reflete o estado real do player.
     } catch (err) {
+      if (!isCurrentAttempt()) return;
       console.error('❌ Erro ao reproduzir:', err);
       clearWatchdog();
+      if (isReleasedPlayerError(err)) {
+        setError('O reprodutor foi encerrado. Volte e abra o vídeo novamente.');
+        setLoading(false);
+        return;
+      }
       if (scheduleRetry(episode)) return;
       setError('Erro ao reproduzir: ' + String(err));
       setLoading(false);
@@ -556,6 +613,16 @@ export default function PlayerScreen() {
     retryCountRef.current = 0;
     setRetryAttempt(0);
     attemptPlayback(selectedEpisode);
+  };
+
+  const handleResolutionRetry = () => {
+    const failedResolution = failedResolutionRef.current;
+    if (!failedResolution) return;
+    void resolveSource(
+      failedResolution.url,
+      failedResolution.label,
+      failedResolution.pushCurrentToStack
+    );
   };
 
   // Troca a fonte do player sempre que o episódio selecionado mudar
@@ -573,6 +640,12 @@ export default function PlayerScreen() {
 
     return () => {
       cancelled = true;
+      playbackAttemptRef.current += 1;
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+      clearWatchdog();
     };
   }, [player, resumePosition, selectedEpisode]);
 
@@ -626,8 +699,11 @@ export default function PlayerScreen() {
         <View style={styles.centerContent}>
           <Text style={styles.errorText}>❌ {error}</Text>
           <View style={styles.errorButtonRow}>
-            {selectedEpisode && (
-              <TouchableOpacity style={styles.retryButton} onPress={handleManualRetry}>
+            {(selectedEpisode || failedResolutionRef.current) && (
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={selectedEpisode ? handleManualRetry : handleResolutionRetry}
+              >
                 <Text style={styles.backText}>↻ Tentar novamente</Text>
               </TouchableOpacity>
             )}
