@@ -25,8 +25,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [],
-      "package": "com.sethlussueki.LKCLIP",
-      "usesCleartextTraffic": true
+      "package": "com.sethlussueki.LKCLIP"
     },
     "web": {
       "output": "static",
@@ -48,7 +47,15 @@
         }
       ],
       "react-native-video",
-      "expo-video"
+      "expo-video",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
