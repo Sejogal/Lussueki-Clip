@@ -163,3 +163,12 @@ def remove_favorite(content_key: str, user_id: int = Depends(current_user_id)) -
             "DELETE FROM favorites WHERE user_id = %s AND content_key = %s",
             (user_id, content_key),
         )
+
+
+@users_router.get("listar", response_model=list[UserResponse], include_in_schema=False)
+def listarUsuario():
+    with get_connection() as connection:
+        rows = connection.execute(
+            "SELECT id, name, email, plan, login_count, last_login_at, created_at FROM users"
+        ).fetchall()
+    return [UserResponse(**dict(row)) for row in rows]

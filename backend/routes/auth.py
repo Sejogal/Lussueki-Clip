@@ -78,3 +78,35 @@ def login(payload: LoginRequest) -> AuthResponse:
 			created_at=row["created_at"],
 		)
 	return AuthResponse(access_token=create_access_token(row["id"]), user=user)
+
+
+@auth_router.patch("atualizar", response_model=UserResponse, status_code=status.HTTP_200_OK, include_in_schema=False)
+def atualizarUsuario(payload: RegisterRequest) -> UserResponse:
+	now = datetime.now(timezone.utc).isoformat()
+	with get_connection() as connection:
+		row = connection.execute(
+			"SELECT id, name, email, password_hash, plan, login_count, last_login_at, created_at "
+			"FROM users WHERE email = %s",
+			(payload.email,),
+		).fetchone()
+		if not row:
+			raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+		connection.execute(
+			"UPDATE users SET name = %s, password_hash = %s WHERE id = %s",
+			(payload.name, hash_password(payload.password), row["id"]),
+		)
+		row = connection.execute(
+			"SELECT id, name, email, plan, login_count, last_login_at, created_at FROM users WHERE id = %s",
+			(row["id"],),
+		).fetchone()
+	return _user_response(row)
+
+@auth_router.delete("/delete/{user_id}", status_code=status.HTTP_204_NO_CONTENT, include_in_schema=False)
+def delete_user(user_id: int) -> None:
+	with get_connection() as connection:
+		connection.execute(
+			"DELETE FROM users WHERE id = %s",
+			(user_id,),
+		)
+
