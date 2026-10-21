@@ -165,7 +165,7 @@ def remove_favorite(content_key: str, user_id: int = Depends(current_user_id)) -
         )
 
 
-@users_router.get("listar", response_model=list[UserResponse], include_in_schema=False)
+@users_router.get("/listar", response_model=list[UserResponse], include_in_schema=False)
 def listarUsuario():
     with get_connection() as connection:
         rows = connection.execute(

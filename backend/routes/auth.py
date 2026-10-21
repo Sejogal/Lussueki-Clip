@@ -80,7 +80,7 @@ def login(payload: LoginRequest) -> AuthResponse:
 	return AuthResponse(access_token=create_access_token(row["id"]), user=user)
 
 
-@auth_router.patch("atualizar", response_model=UserResponse, status_code=status.HTTP_200_OK, include_in_schema=False)
+@auth_router.patch("/atualizar", response_model=UserResponse, status_code=status.HTTP_200_OK, include_in_schema=False)
 def atualizarUsuario(payload: RegisterRequest) -> UserResponse:
 	now = datetime.now(timezone.utc).isoformat()
 	with get_connection() as connection:
