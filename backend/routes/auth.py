@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import psycopg2
 
 from fastapi import APIRouter, Depends, HTTPException, status
