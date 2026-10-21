@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 Plan = Literal["free", "premium", "super_premium"]
 
@@ -32,6 +32,27 @@ class LoginRequest(BaseModel):
     @classmethod
     def normalize_email(cls, value: str) -> str:
         return value.strip().lower()
+
+
+class UserUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=80)
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if len(value) < 2:
+            raise ValueError("O nome deve ter pelo menos 2 caracteres")
+        return value
+
+    @model_validator(mode="after")
+    def require_a_change(self):
+        if self.name is None and self.password is None:
+            raise ValueError("Informe o nome ou a senha para atualizar")
+        return self
 
 
 class UserResponse(BaseModel):

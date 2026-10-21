@@ -1,4 +1,5 @@
 import hashlib
+import os
 from datetime import datetime, timezone
 
 import jwt
@@ -165,8 +166,19 @@ def remove_favorite(content_key: str, user_id: int = Depends(current_user_id)) -
         )
 
 
-@users_router.get("/listar", response_model=list[UserResponse], include_in_schema=False)
-def listarUsuario():
+@users_router.get("/listar", response_model=list[UserResponse])
+def listar_usuarios(user_id: int = Depends(current_user_id)):
+    """Lista utilizadores; requer token de uma conta definida em LK_CLIP_ADMIN_EMAILS."""
+    with get_connection() as connection:
+        actor = connection.execute("SELECT email FROM users WHERE id = %s", (user_id,)).fetchone()
+    admin_emails = {
+        email.strip().lower()
+        for email in os.getenv("LK_CLIP_ADMIN_EMAILS", "").split(",")
+        if email.strip()
+    }
+    if not actor or actor["email"].lower() not in admin_emails:
+        raise HTTPException(status_code=403, detail="Apenas administradores podem listar utilizadores")
+
     with get_connection() as connection:
         rows = connection.execute(
             "SELECT id, name, email, plan, login_count, last_login_at, created_at FROM users"

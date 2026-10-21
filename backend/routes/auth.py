@@ -1,11 +1,10 @@
-from datetime import datetime, timezone
-
 import psycopg2
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from database import get_connection
-from schemas import AuthResponse, LoginRequest, RegisterRequest, UserResponse
+from routes.users import current_user_id
+from schemas import AuthResponse, LoginRequest, RegisterRequest, UserResponse, UserUpdateRequest
 from security import create_access_token, hash_password, verify_password
 
 auth_router = APIRouter(prefix="/auth", tags=["Usuários"])
@@ -80,25 +79,33 @@ def login(payload: LoginRequest) -> AuthResponse:
 	return AuthResponse(access_token=create_access_token(row["id"]), user=user)
 
 
-@auth_router.patch("/atualizar", response_model=UserResponse, status_code=status.HTTP_200_OK, include_in_schema=False)
-def atualizarUsuario(payload: RegisterRequest) -> UserResponse:
-	now = datetime.now(timezone.utc).isoformat()
+@auth_router.patch("/atualizar", response_model=UserResponse, status_code=status.HTTP_200_OK)
+def atualizar_usuario(payload: UserUpdateRequest, user_id: int = Depends(current_user_id)) -> UserResponse:
+	"""Atualiza nome e/ou senha da conta autenticada."""
 	with get_connection() as connection:
 		row = connection.execute(
 			"SELECT id, name, email, password_hash, plan, login_count, last_login_at, created_at "
-			"FROM users WHERE email = %s",
-			(payload.email,),
+			"FROM users WHERE id = %s",
+			(user_id,),
 		).fetchone()
 		if not row:
 			raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
-		connection.execute(
-			"UPDATE users SET name = %s, password_hash = %s WHERE id = %s",
-			(payload.name, hash_password(payload.password), row["id"]),
-		)
+		if payload.name is not None and payload.password is not None:
+			connection.execute(
+				"UPDATE users SET name = %s, password_hash = %s WHERE id = %s",
+				(payload.name, hash_password(payload.password), user_id),
+			)
+		elif payload.name is not None:
+			connection.execute("UPDATE users SET name = %s WHERE id = %s", (payload.name, user_id))
+		else:
+			connection.execute(
+				"UPDATE users SET password_hash = %s WHERE id = %s",
+				(hash_password(payload.password), user_id),
+			)
 		row = connection.execute(
 			"SELECT id, name, email, plan, login_count, last_login_at, created_at FROM users WHERE id = %s",
-			(row["id"],),
+			(user_id,),
 		).fetchone()
 	return _user_response(row)
 
