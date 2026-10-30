@@ -103,6 +103,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 24,
   },
+  episodePreview: {
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#171719',
+  },
+  episodePreviewImage: { width: '100%', height: 190, backgroundColor: '#252529' },
+  episodePreviewFallback: { alignItems: 'center', justifyContent: 'center' },
+  episodePreviewInfo: { padding: 12, gap: 10 },
+  episodePreviewTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  previewPlayButton: { alignSelf: 'flex-start', backgroundColor: '#e50914', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 7 },
   episodeItem: {
     flexDirection: 'row',
     alignItems: 'center',

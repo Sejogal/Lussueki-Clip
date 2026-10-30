@@ -49,3 +49,11 @@ python -m unittest discover -s tests -v
 
 O app Expo usa `EXPO_PUBLIC_LK_CLIP_API_URL=http://IP_DO_COMPUTADOR:8000`.
 Em celular fisico, inicie a API com `--host 0.0.0.0` e mantenha computador e celular na mesma rede Wi-Fi.
+
+## Catálogo Cloudflare
+
+Configure `LK_CLIP_CLOUDFLARE_CATALOG_URL` com a URL de origem. Use `{category}`
+quando a origem separar o conteúdo por categoria, por exemplo:
+`https://seu-dominio.workers.dev/catalog/{category}`.
+`GET /catalog/{category}` repassa a resposta da origem (JSON ou M3U); o app
+pode então consumir essa rota usando a URL pública da API.

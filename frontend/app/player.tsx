@@ -2,6 +2,8 @@
 import FavoriteButton from '@/components/FavoriteButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { ARCHIVE_ITEM_PREFIX, getArchiveOrgPlayableUrl } from '@/services/archiveOrg';
+import { markContentAsFailed } from '@/services/deviceCache';
+import { downloadMedia, getDownloadedMedia } from '@/services/downloads';
 import { fetchPlaylistEntries, isDirectMediaUrl, PlaylistEntry } from '@/utils/playlist';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoPlayer, VideoView } from 'expo-video';
@@ -192,6 +194,8 @@ export default function PlayerScreen() {
   const [currentList, setCurrentList] = useState<ListLevel | null>(null);
   const [listStack, setListStack] = useState<ListLevel[]>([]);
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
+  const [previewEpisode, setPreviewEpisode] = useState<Episode | null>(null);
+  const [downloadState, setDownloadState] = useState<'idle' | 'downloading' | 'downloaded' | 'error'>('idle');
 
   const currentListRef = useRef<ListLevel | null>(null);
   useEffect(() => {
@@ -237,7 +241,7 @@ export default function PlayerScreen() {
         return;
       }
 
-      if (isDirectMediaUrl(url)) {
+      if (url.startsWith('file://') || isDirectMediaUrl(url)) {
         if (token !== resolveTokenRef.current) return;
         failedResolutionRef.current = null;
         setSelectedEpisode({ title: label, url });
@@ -286,12 +290,14 @@ export default function PlayerScreen() {
         setListStack((stack) => [...stack, currentListRef.current!]);
       }
       setCurrentList({ title: label, entries });
+      setPreviewEpisode(entries[0]);
       failedResolutionRef.current = null;
       setSelectedEpisode(null);
       setLoading(false);
       setResolving(false);
     } catch (err) {
       if (token !== resolveTokenRef.current) return;
+      void markContentAsFailed(url);
       if (isPlaylistNetworkError(err)) {
         console.warn('Não foi possível conectar à fonte desta lista.');
         setError('Não foi possível conectar à fonte do conteúdo. Verifique sua conexão e tente novamente.');
@@ -481,6 +487,7 @@ export default function PlayerScreen() {
           return;
         }
 
+        if (episode) void markContentAsFailed(episode.url);
         setLoading(false);
         setError('Erro ao carregar o stream: ' + getFriendlyErrorMessage(rawMessage));
       }
@@ -576,8 +583,9 @@ export default function PlayerScreen() {
         referer = undefined;
       }
 
+      const downloaded = await getDownloadedMedia(episode.url);
       await player.replaceAsync({
-        uri: episode.url,
+        uri: downloaded?.uri || episode.url,
         headers: {
           'User-Agent': USER_AGENT,
           ...(referer ? { Referer: referer } : {}),
@@ -614,6 +622,28 @@ export default function PlayerScreen() {
     setRetryAttempt(0);
     attemptPlayback(selectedEpisode);
   };
+
+  const handleDownload = useCallback(async () => {
+    if (!selectedEpisode || paramCategoryKey?.startsWith('iptv:')) return;
+    setDownloadState('downloading');
+    try {
+      await downloadMedia(selectedEpisode.url, selectedEpisode.title);
+      setDownloadState('downloaded');
+    } catch (downloadError) {
+      console.warn('Não foi possível baixar o conteúdo:', downloadError);
+      setDownloadState('error');
+    }
+  }, [paramCategoryKey, selectedEpisode]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDownloadState('idle');
+    if (!selectedEpisode || selectedEpisode.url.startsWith('file://') || paramCategoryKey?.startsWith('iptv:') || selectedEpisode.url.split('?')[0].toLowerCase().endsWith('.m3u8')) return;
+    void getDownloadedMedia(selectedEpisode.url).then((download) => {
+      if (!cancelled && download) setDownloadState('downloaded');
+    });
+    return () => { cancelled = true; };
+  }, [paramCategoryKey, selectedEpisode]);
 
   const handleResolutionRetry = () => {
     const failedResolution = failedResolutionRef.current;
@@ -656,11 +686,15 @@ export default function PlayerScreen() {
     [resolveSource]
   );
 
+  const handleEpisodePreview = useCallback((item: Episode) => {
+    setPreviewEpisode(item);
+  }, []);
+
   const renderEpisodeItem = useCallback(
     ({ item, index }: { item: Episode; index: number }) => (
-      <EpisodeItem item={item} index={index} onPress={handleEpisodePress} />
+      <EpisodeItem item={item} index={index} onPress={handleEpisodePreview} />
     ),
-    [handleEpisodePress]
+    [handleEpisodePreview]
   );
 
   const episodeKeyExtractor = useCallback((item: Episode, index: number) => `${index}-${item.url}`, []);
@@ -749,6 +783,23 @@ export default function PlayerScreen() {
         )}
         <FlatList
           data={currentList.entries}
+          ListHeaderComponent={previewEpisode ? (
+            <View style={styles.episodePreview}>
+              {previewEpisode.posterUrl || paramPosterUrl ? (
+                <Image source={{ uri: previewEpisode.posterUrl || paramPosterUrl }} style={styles.episodePreviewImage} resizeMode="cover" />
+              ) : (
+                <View style={[styles.episodePreviewImage, styles.episodePreviewFallback]}>
+                  <Text style={styles.episodeIndexText}>Prévia do episódio</Text>
+                </View>
+              )}
+              <View style={styles.episodePreviewInfo}>
+                <Text style={styles.episodePreviewTitle} numberOfLines={2}>{previewEpisode.title}</Text>
+                <TouchableOpacity style={styles.previewPlayButton} onPress={() => handleEpisodePress(previewEpisode)}>
+                  <Text style={styles.backText}>▶  Reproduzir episódio</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
           keyExtractor={episodeKeyExtractor}
           contentContainerStyle={styles.episodeList}
           renderItem={renderEpisodeItem}
@@ -787,6 +838,17 @@ export default function PlayerScreen() {
         <Text style={styles.backText}>← Voltar</Text>
       </TouchableOpacity>
       <View style={styles.topRightStack}>
+        {selectedEpisode && !selectedEpisode.url.startsWith('file://') && !paramCategoryKey?.startsWith('iptv:') && !selectedEpisode.url.split('?')[0].toLowerCase().endsWith('.m3u8') && (
+          <TouchableOpacity
+            style={styles.episodesButton}
+            disabled={downloadState === 'downloading' || downloadState === 'downloaded'}
+            onPress={() => void handleDownload()}
+          >
+            <Text style={styles.backText}>
+              {downloadState === 'downloading' ? 'Baixando…' : downloadState === 'downloaded' ? '✓ Baixado' : downloadState === 'error' ? 'Tentar download' : '↓ Baixar'}
+            </Text>
+          </TouchableOpacity>
+        )}
         {streamUrl && (
           <FavoriteButton
             item={{

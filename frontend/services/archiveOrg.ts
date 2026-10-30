@@ -13,6 +13,7 @@
 //    de vídeo disponível pra streaming.
 
 import { PlaylistEntry } from '@/utils/playlist';
+import { filterFailedContent, readDeviceCache, writeDeviceCache } from '@/services/deviceCache';
 
 const ADVANCED_SEARCH_URL = 'https://archive.org/advancedsearch.php';
 const METADATA_URL = 'https://archive.org/metadata';
@@ -80,23 +81,24 @@ type ArchiveSearchDoc = {
 };
 
 export async function searchArchiveOrg(query: string, rows = 24): Promise<PlaylistEntry[]> {
+  const cacheKey = `archive-search:${query}:${rows}`;
+  const cached = await readDeviceCache<PlaylistEntry[]>(cacheKey);
+  if (cached?.fresh) return filterFailedContent(cached.value);
   const url =
     `${ADVANCED_SEARCH_URL}?q=${encodeURIComponent(query)}` +
     `&fl[]=identifier&fl[]=title` +
     `&sort[]=downloads+desc` +
     `&rows=${rows}&page=1&output=json`;
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ao buscar no archive.org`);
-  }
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status} ao buscar no archive.org`);
 
-  const data = await response.json();
-  const docs: ArchiveSearchDoc[] = data?.response?.docs ?? [];
-
-  return docs
-    .filter((doc) => !!doc.identifier)
-    .map((doc) => ({
+    const data = await response.json();
+    const docs: ArchiveSearchDoc[] = data?.response?.docs ?? [];
+    const entries = docs
+      .filter((doc) => !!doc.identifier)
+      .map((doc) => ({
       title: doc.title || doc.identifier,
       url: `${ARCHIVE_ITEM_PREFIX}${doc.identifier}`,
       // O archive.org gera automaticamente uma thumbnail pra qualquer
@@ -104,6 +106,12 @@ export async function searchArchiveOrg(query: string, rows = 24): Promise<Playli
       // só pra mostrar o pôster na lista.
       posterUrl: `https://archive.org/services/img/${doc.identifier}`,
     }));
+    await writeDeviceCache(cacheKey, entries);
+    return filterFailedContent(entries);
+  } catch (error) {
+    if (cached) return filterFailedContent(cached.value);
+    throw error;
+  }
 }
 
 type ArchiveMetadataFile = {

@@ -3,7 +3,8 @@ import FavoriteButton from '@/components/FavoriteButton';
 import { PublicDomainCategory, searchArchiveOrg } from '@/services/archiveOrg';
 import { PlaylistEntry } from '@/utils/playlist';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
@@ -60,7 +61,7 @@ function PublicDomainRow({ category }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let cancelled = false;
 
     (async () => {
@@ -81,7 +82,7 @@ function PublicDomainRow({ category }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [category.key, category.query]);
+  }, [category.key, category.query]));
 
   const handlePress = useCallback(
     (item: PlaylistEntry) => {

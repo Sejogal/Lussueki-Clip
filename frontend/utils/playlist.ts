@@ -14,6 +14,8 @@
 // consome o PlaylistEntry (a Home só lista; o player resolve o próximo
 // nível quando necessário).
 
+import { filterFailedContent, readDeviceCache, writeDeviceCache } from '@/services/deviceCache';
+
 export type PlaylistEntry = {
   title: string;
   url: string;
@@ -132,16 +134,22 @@ export function parseArchiveDirectoryListing(html: string, baseUrl: string): Pla
  * - Qualquer outra coisa é tratada como playlist EXTM3U em texto
  */
 export async function fetchPlaylistEntries(url: string): Promise<PlaylistEntry[]> {
-  const response = await fetch(url, {
-    headers: { 'User-Agent': USER_AGENT },
-  });
+  const cached = await readDeviceCache<PlaylistEntry[]>(`playlist:${url}`);
+  if (cached?.fresh) return filterFailedContent(cached.value);
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ao buscar ${url}`);
+  try {
+    const response = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    if (!response.ok) throw new Error(`HTTP ${response.status} ao buscar ${url}`);
+
+    const text = await response.text();
+    const isDirectoryListing = url.split('?')[0].endsWith('/');
+    const entries = isDirectoryListing
+      ? parseArchiveDirectoryListing(text, url)
+      : parseExtendedM3u(text, url);
+    await writeDeviceCache(`playlist:${url}`, entries);
+    return filterFailedContent(entries);
+  } catch (error) {
+    if (cached) return filterFailedContent(cached.value);
+    throw error;
   }
-
-  const text = await response.text();
-  const isDirectoryListing = url.split('?')[0].endsWith('/');
-
-  return isDirectoryListing ? parseArchiveDirectoryListing(text, url) : parseExtendedM3u(text, url);
 }

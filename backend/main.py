@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db
 from routes.auth import auth_router
+from routes.catalog import catalog_router
 from routes.users import users_router
 
 
@@ -40,6 +41,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router(catalog_router)
 
 
 @app.get("/health", tags=["Sistema"])

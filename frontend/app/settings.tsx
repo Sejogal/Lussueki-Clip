@@ -41,6 +41,16 @@ export default function SettingsScreen() {
           Um projeto independente para reunir filmes, séries, animes e canais ao vivo em uma experiência simples de explorar.
         </Text>
 
+        <TouchableOpacity
+          accessibilityRole="button"
+          style={styles.downloadsButton}
+          onPress={() => router.push('/downloads')}
+        >
+          <Ionicons name="download-outline" size={20} color="#fff" />
+          <Text style={styles.downloadsButtonText}>Meus downloads</Text>
+          <Ionicons name="chevron-forward" size={18} color="#aaa" />
+        </TouchableOpacity>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Sobre o desenvolvedor</Text>
           <View style={styles.developerPanel}>
@@ -85,6 +95,8 @@ const styles = StyleSheet.create({
   sectionEyebrow: { color: '#ff777d', fontSize: 11, fontWeight: '800', marginBottom: 9 },
   introTitle: { color: '#fff', fontSize: 25, lineHeight: 31, fontWeight: '800', maxWidth: 320 },
   introText: { color: '#a1a1a8', fontSize: 14, lineHeight: 21, marginTop: 10 },
+  downloadsButton: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#151517', borderWidth: 1, borderColor: '#2a2a2e', borderRadius: 9, paddingHorizontal: 14, marginTop: 22 },
+  downloadsButtonText: { flex: 1, color: '#fff', fontSize: 14, fontWeight: '700' },
   section: { marginTop: 32 },
   sectionTitle: { color: '#f4f4f5', fontSize: 16, fontWeight: '700', marginBottom: 12 },
   developerPanel: { backgroundColor: '#151517', borderWidth: 1, borderColor: '#2a2a2e', borderRadius: 10, padding: 17 },
