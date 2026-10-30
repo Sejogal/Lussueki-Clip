@@ -1,13 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import React from 'react';
-import { Alert, Linking, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, Linking, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { clearDeviceCache } from '@/services/deviceCache';
+import { invalidateIptvCache } from '@/services/iptv';
 
 const PORTFOLIO_URL = 'https://portfolio-m7sj.onrender.com/';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const [clearingCache, setClearingCache] = useState(false);
 
   const openPortfolio = async () => {
     try {
@@ -15,6 +18,26 @@ export default function SettingsScreen() {
     } catch {
       Alert.alert('Não foi possível abrir o portfólio', 'Verifique sua conexão e tente novamente.');
     }
+  };
+
+  const confirmClearCache = () => {
+    Alert.alert(
+      'Limpar cache de conteúdo?',
+      'As listas de filmes, séries, animes e TV ao vivo já guardadas neste aparelho serão apagadas — na próxima vez que você abrir cada uma, ela será buscada de novo do servidor.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Limpar',
+          style: 'destructive',
+          onPress: () => {
+            setClearingCache(true);
+            void clearDeviceCache()
+              .then(() => invalidateIptvCache())
+              .finally(() => setClearingCache(false));
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -41,15 +64,23 @@ export default function SettingsScreen() {
           Um projeto independente para reunir filmes, séries, animes e canais ao vivo em uma experiência simples de explorar.
         </Text>
 
-        <TouchableOpacity
-          accessibilityRole="button"
-          style={styles.downloadsButton}
-          onPress={() => router.push('/downloads')}
-        >
-          <Ionicons name="download-outline" size={20} color="#fff" />
-          <Text style={styles.downloadsButtonText}>Meus downloads</Text>
-          <Ionicons name="chevron-forward" size={18} color="#aaa" />
-        </TouchableOpacity>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Armazenamento</Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            style={styles.storageRow}
+            disabled={clearingCache}
+            onPress={confirmClearCache}
+          >
+            <View style={[styles.storageIcon, styles.cacheIcon]}>
+              {clearingCache ? <ActivityIndicator size="small" color="#8fd3ff" /> : <Ionicons name="trash-outline" size={18} color="#8fd3ff" />}
+            </View>
+            <View style={styles.storageTextGroup}>
+              <Text style={styles.storageTitle}>Limpar cache de conteúdo</Text>
+              <Text style={styles.storageSubtitle}>Força recarregar as listas do servidor</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Sobre o desenvolvedor</Text>
@@ -95,10 +126,14 @@ const styles = StyleSheet.create({
   sectionEyebrow: { color: '#ff777d', fontSize: 11, fontWeight: '800', marginBottom: 9 },
   introTitle: { color: '#fff', fontSize: 25, lineHeight: 31, fontWeight: '800', maxWidth: 320 },
   introText: { color: '#a1a1a8', fontSize: 14, lineHeight: 21, marginTop: 10 },
-  downloadsButton: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#151517', borderWidth: 1, borderColor: '#2a2a2e', borderRadius: 9, paddingHorizontal: 14, marginTop: 22 },
-  downloadsButtonText: { flex: 1, color: '#fff', fontSize: 14, fontWeight: '700' },
   section: { marginTop: 32 },
   sectionTitle: { color: '#f4f4f5', fontSize: 16, fontWeight: '700', marginBottom: 12 },
+  storageRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, backgroundColor: '#151517', borderWidth: 1, borderColor: '#2a2a2e', borderRadius: 9, paddingHorizontal: 14 },
+  storageIcon: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  cacheIcon: { backgroundColor: '#17262e' },
+  storageTextGroup: { flex: 1 },
+  storageTitle: { color: '#f5f5f6', fontSize: 14, fontWeight: '700' },
+  storageSubtitle: { color: '#96969d', fontSize: 12, marginTop: 3 },
   developerPanel: { backgroundColor: '#151517', borderWidth: 1, borderColor: '#2a2a2e', borderRadius: 10, padding: 17 },
   developerIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: '#302023', marginBottom: 14 },
   developerTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },

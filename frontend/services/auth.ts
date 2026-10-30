@@ -1,8 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getApiUrl } from '@/config/api';
 
 const SESSION_STORAGE_KEY = '@lk-clip/auth-session';
-const rawApiUrl = process.env.EXPO_PUBLIC_LK_CLIP_API_URL?.trim();
-const API_URL = rawApiUrl?.replace(/\/$/, '');
 
 export type AuthUser = {
   id: number;
@@ -57,15 +56,6 @@ export class ApiError extends Error {
   ) {
     super(message);
   }
-}
-
-function getApiUrl(): string {
-  if (!API_URL) {
-    throw new Error(
-      'Configure EXPO_PUBLIC_LK_CLIP_API_URL com o endereço do backend antes de entrar na conta.'
-    );
-  }
-  return API_URL;
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {

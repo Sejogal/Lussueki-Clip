@@ -41,8 +41,11 @@ export default function FavoritesRow() {
 
   const handlePress = useCallback(
     (item: FavoriteItem) => {
+      // Canais de TV ao vivo vão direto ao player, como em qualquer outro
+      // ponto do app — não faz sentido um preview para um canal ao vivo.
+      const isLiveChannel = (item.categoryKey ?? '').startsWith('iptv:');
       router.push({
-        pathname: '/player',
+        pathname: isLiveChannel ? '/player' : '/preview',
         params: {
           streamUrl: item.url,
           title: item.title,

@@ -44,6 +44,6 @@ app.include_router(users_router)
 app.include_router(catalog_router)
 
 
-@app.get("/health", tags=["Sistema"])
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["Sistema"])
 def health() -> dict[str, str]:
 	return {"status": "ok"}

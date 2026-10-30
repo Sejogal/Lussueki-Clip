@@ -87,12 +87,13 @@ function PublicDomainRow({ category }: Props) {
   const handlePress = useCallback(
     (item: PlaylistEntry) => {
       router.push({
-        pathname: '/player',
+        pathname: '/preview',
         params: {
           streamUrl: item.url,
           title: item.title,
           posterUrl: item.posterUrl ?? '',
           categoryKey: category.key,
+          synopsis: item.synopsis ?? '',
         },
       });
     },

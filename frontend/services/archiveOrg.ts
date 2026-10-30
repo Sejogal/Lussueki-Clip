@@ -12,7 +12,7 @@
 //    tocar um item, busca os metadados dele e escolhe o melhor arquivo
 //    de vídeo disponível pra streaming.
 
-import { PlaylistEntry } from '@/utils/playlist';
+import { PlaylistEntry, stripHtml } from '@/utils/playlist';
 import { filterFailedContent, readDeviceCache, writeDeviceCache } from '@/services/deviceCache';
 
 const ADVANCED_SEARCH_URL = 'https://archive.org/advancedsearch.php';
@@ -78,7 +78,17 @@ export const PUBLIC_DOMAIN_CATEGORIES: PublicDomainCategory[] = [
 type ArchiveSearchDoc = {
   identifier: string;
   title?: string;
+  // O archive.org devolve string normalmente, mas às vezes um array
+  // (campos multi-valor) — tratamos os dois casos.
+  description?: string | string[];
 };
+
+function firstDescription(description: string | string[] | undefined): string | undefined {
+  const raw = Array.isArray(description) ? description[0] : description;
+  if (!raw) return undefined;
+  const text = stripHtml(raw);
+  return text.length > 0 ? text : undefined;
+}
 
 export async function searchArchiveOrg(query: string, rows = 24): Promise<PlaylistEntry[]> {
   const cacheKey = `archive-search:${query}:${rows}`;
@@ -86,7 +96,7 @@ export async function searchArchiveOrg(query: string, rows = 24): Promise<Playli
   if (cached?.fresh) return filterFailedContent(cached.value);
   const url =
     `${ADVANCED_SEARCH_URL}?q=${encodeURIComponent(query)}` +
-    `&fl[]=identifier&fl[]=title` +
+    `&fl[]=identifier&fl[]=title&fl[]=description` +
     `&sort[]=downloads+desc` +
     `&rows=${rows}&page=1&output=json`;
 
@@ -105,6 +115,7 @@ export async function searchArchiveOrg(query: string, rows = 24): Promise<Playli
       // item a partir desse endpoint — não precisa buscar metadados
       // só pra mostrar o pôster na lista.
       posterUrl: `https://archive.org/services/img/${doc.identifier}`,
+      synopsis: firstDescription(doc.description),
     }));
     await writeDeviceCache(cacheKey, entries);
     return filterFailedContent(entries);

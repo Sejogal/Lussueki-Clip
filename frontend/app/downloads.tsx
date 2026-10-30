@@ -1,4 +1,5 @@
-import { listDownloads, removeDownload, DownloadedMedia } from '@/services/downloads';
+import { listDownloads, removeDownload } from '@/services/downloads';
+import type { DownloadedMedia } from '@/services/downloads';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
@@ -19,7 +20,7 @@ export default function DownloadsScreen() {
 
   const play = (item: DownloadedMedia) => router.push({
     pathname: '/player',
-    params: { streamUrl: item.uri, title: item.title, categoryKey: 'download' },
+    params: { streamUrl: item.url, title: item.title, categoryKey: 'download' },
   });
 
   return (

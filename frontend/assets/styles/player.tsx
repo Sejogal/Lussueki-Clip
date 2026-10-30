@@ -42,6 +42,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     borderRadius: 8,
   },
+  liveBadge: {
+    // Fica por baixo do botão "Voltar" (mesmo left), em vez de ao lado —
+    // colocar ao lado exigia adivinhar a largura do texto do botão, que
+    // varia (fonte, idioma), e acabava sobrepondo.
+    position: 'absolute',
+    top: 98,
+    left: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(217,22,32,0.9)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    zIndex: 10,
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#fff',
+  },
+  liveBadgeText: { color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
   topRightStack: {
     position: 'absolute',
     top: 50,
@@ -103,17 +126,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 24,
   },
-  episodePreview: {
-    marginBottom: 16,
-    borderRadius: 12,
+  contentCover: {
+    height: 250,
+    marginTop: 2,
+    marginBottom: 4,
     overflow: 'hidden',
-    backgroundColor: '#171719',
+    backgroundColor: '#111113',
   },
-  episodePreviewImage: { width: '100%', height: 190, backgroundColor: '#252529' },
-  episodePreviewFallback: { alignItems: 'center', justifyContent: 'center' },
-  episodePreviewInfo: { padding: 12, gap: 10 },
-  episodePreviewTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  previewPlayButton: { alignSelf: 'flex-start', backgroundColor: '#e50914', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 7 },
+  contentCoverFallback: { alignItems: 'center', justifyContent: 'center' },
+  contentCoverGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '78%' },
+  contentCoverText: { position: 'absolute', left: 18, right: 18, bottom: 18, gap: 5 },
+  contentCoverEyebrow: { color: '#ff777d', fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  contentCoverTitle: { color: '#fff', fontSize: 22, lineHeight: 27, fontWeight: '800' },
+  downloadButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   episodeItem: {
     flexDirection: 'row',
     alignItems: 'center',

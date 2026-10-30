@@ -94,7 +94,7 @@ function CategoryRow({ categoryKey, config }: Props) {
   const handlePress = useCallback(
     (item: PlaylistEntry) => {
       router.push({
-        pathname: '/player',
+        pathname: '/preview',
         params: {
           streamUrl: item.url,
           title: item.title,

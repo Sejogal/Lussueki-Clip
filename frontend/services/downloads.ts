@@ -5,6 +5,7 @@ const DOWNLOADS_KEY = '@lk-clip/downloads';
 const DOWNLOAD_DIRECTORY = `${FileSystem.documentDirectory}downloads/`;
 
 export type DownloadedMedia = { url: string; title: string; uri: string; savedAt: number };
+export type DownloadProgress = { writtenBytes: number; totalBytes: number | null };
 
 function hashUrl(url: string): string {
   let hash = 2166136261;
@@ -36,12 +37,23 @@ export async function getDownloadedMedia(url: string): Promise<DownloadedMedia |
   }
 }
 
-export async function downloadMedia(url: string, title: string): Promise<DownloadedMedia> {
+export async function downloadMedia(
+  url: string,
+  title: string,
+  onProgress?: (progress: DownloadProgress) => void
+): Promise<DownloadedMedia> {
   if (!FileSystem.documentDirectory) throw new Error('Armazenamento local indisponível neste dispositivo.');
   const extension = url.split('?')[0].match(/\.(mp4|mkv|mov|webm|mp3)$/i)?.[0].toLowerCase() ?? '.mp4';
   await FileSystem.makeDirectoryAsync(DOWNLOAD_DIRECTORY, { intermediates: true });
   const uri = `${DOWNLOAD_DIRECTORY}${hashUrl(url)}${extension}`;
-  const result = await FileSystem.downloadAsync(url, uri);
+  const task = FileSystem.createDownloadResumable(url, uri, {}, (progress) => {
+    onProgress?.({
+      writtenBytes: progress.totalBytesWritten,
+      totalBytes: progress.totalBytesExpectedToWrite > 0 ? progress.totalBytesExpectedToWrite : null,
+    });
+  });
+  const result = await task.downloadAsync();
+  if (!result) throw new Error('O download foi interrompido.');
   if (result.status < 200 || result.status >= 300) {
     throw new Error(`O servidor respondeu com HTTP ${result.status}.`);
   }

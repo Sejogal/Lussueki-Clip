@@ -4,12 +4,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ARCHIVE_ITEM_PREFIX, getArchiveOrgPlayableUrl } from '@/services/archiveOrg';
 import { markContentAsFailed } from '@/services/deviceCache';
 import { downloadMedia, getDownloadedMedia } from '@/services/downloads';
+import type { DownloadProgress } from '@/services/downloads';
 import { fetchPlaylistEntries, isDirectMediaUrl, PlaylistEntry } from '@/utils/playlist';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoPlayer, VideoView } from 'expo-video';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    Animated,
     Dimensions,
     FlatList,
     Image,
@@ -79,6 +83,11 @@ const RETRYABLE_NETWORK_PATTERNS = [
 // resolvam sozinhas sem o usuário nem perceber que algo falhou.
 const RETRY_DELAYS_MS = [2000, 3000, 5000, 8000, 12000, 15000, 15000]; // soma ≈ 60s
 
+function formatDownloadBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
 function getHttpCodeFromError(message: string): string | null {
   const match = message.match(/response code:\s*(\d{3})/i);
   return match ? match[1] : null;
@@ -114,7 +123,7 @@ function getFriendlyErrorMessage(message: string): string {
   if (isTimeoutOrNetworkError(message)) {
     return 'A conexão com o servidor do vídeo demorou demais e expirou (timeout) — geralmente é temporário, pode ser uma rede lenta ou o servidor sobrecarregado.';
   }
-  return message;
+  return 'Não foi possível reproduzir este conteúdo. Verifique a ligação ou tente outro episódio.';
 }
 
 function getContentKey(sourceUrl: string, title: string): string {
@@ -182,6 +191,7 @@ export default function PlayerScreen() {
   const isMountedRef = useRef(false);
   const playbackAttemptRef = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const offlinePlaybackRef = useRef(false);
 
   // ── Resolução recursiva de playlists ─────────────────────────────────
   // A hierarquia aqui pode ter MAIS DE UM NÍVEL: uma categoria aponta pra
@@ -194,8 +204,35 @@ export default function PlayerScreen() {
   const [currentList, setCurrentList] = useState<ListLevel | null>(null);
   const [listStack, setListStack] = useState<ListLevel[]>([]);
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
-  const [previewEpisode, setPreviewEpisode] = useState<Episode | null>(null);
   const [downloadState, setDownloadState] = useState<'idle' | 'downloading' | 'downloaded' | 'error'>('idle');
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
+
+  // TV ao vivo (canais IPTV) ou qualquer stream .m3u8 — sem duração real,
+  // então a barra de progresso do player nativo não faz sentido pra esse
+  // conteúdo (ou mostra um tempo sem significado). Centralizado aqui em
+  // vez de repetir a mesma checagem em cada lugar que precisa saber disso.
+  const isLive = useMemo(
+    () =>
+      Boolean(paramCategoryKey?.startsWith('iptv:')) ||
+      Boolean(selectedEpisode?.url.split('?')[0].toLowerCase().endsWith('.m3u8')),
+    [paramCategoryKey, selectedEpisode]
+  );
+
+  // Pulsar discreto do pontinho do selo "AO VIVO" — só liga a animação
+  // enquanto ela está mesmo visível, pra não gastar ciclos à toa no resto
+  // da tela.
+  const liveDotOpacity = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!isLive) return;
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(liveDotOpacity, { toValue: 0.25, duration: 700, useNativeDriver: true }),
+        Animated.timing(liveDotOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [isLive, liveDotOpacity]);
 
   const currentListRef = useRef<ListLevel | null>(null);
   useEffect(() => {
@@ -290,7 +327,6 @@ export default function PlayerScreen() {
         setListStack((stack) => [...stack, currentListRef.current!]);
       }
       setCurrentList({ title: label, entries });
-      setPreviewEpisode(entries[0]);
       failedResolutionRef.current = null;
       setSelectedEpisode(null);
       setLoading(false);
@@ -303,7 +339,7 @@ export default function PlayerScreen() {
         setError('Não foi possível conectar à fonte do conteúdo. Verifique sua conexão e tente novamente.');
       } else {
         console.error('❌ Erro ao resolver playlist:', err);
-        setError('Erro ao ler a playlist: ' + String(err));
+        setError('Não foi possível abrir este conteúdo. O link pode estar indisponível. Tente outro título ou volte mais tarde.');
       }
       setLoading(false);
       setResolving(false);
@@ -483,13 +519,19 @@ export default function PlayerScreen() {
         const rawMessage = statusError?.message ?? 'formato não suportado ou servidor recusou a conexão';
         const episode = selectedEpisodeRef.current;
 
+        if (offlinePlaybackRef.current) {
+          setLoading(false);
+          setError('Este download não pôde ser aberto. Apague-o e baixe o conteúdo novamente.');
+          return;
+        }
+
         if (episode && scheduleRetry(episode)) {
           return;
         }
 
         if (episode) void markContentAsFailed(episode.url);
         setLoading(false);
-        setError('Erro ao carregar o stream: ' + getFriendlyErrorMessage(rawMessage));
+        setError(getFriendlyErrorMessage(rawMessage));
       }
     });
 
@@ -568,6 +610,7 @@ export default function PlayerScreen() {
     if (!isCurrentAttempt()) return;
     setLoading(true);
     setError(null);
+    offlinePlaybackRef.current = false;
     armWatchdog(episode);
     try {
       console.log('▶️ Trocando fonte e iniciando reprodução:', episode.url);
@@ -584,12 +627,13 @@ export default function PlayerScreen() {
       }
 
       const downloaded = await getDownloadedMedia(episode.url);
+      const playbackUri = downloaded?.uri || episode.url;
+      offlinePlaybackRef.current = playbackUri.startsWith('file://');
       await player.replaceAsync({
-        uri: downloaded?.uri || episode.url,
-        headers: {
-          'User-Agent': USER_AGENT,
-          ...(referer ? { Referer: referer } : {}),
-        },
+        uri: playbackUri,
+        ...(playbackUri.startsWith('file://')
+          ? {}
+          : { headers: { 'User-Agent': USER_AGENT, ...(referer ? { Referer: referer } : {}) } }),
       });
       if (!isCurrentAttempt()) return;
       if (resumePosition > 0) {
@@ -607,8 +651,13 @@ export default function PlayerScreen() {
         setLoading(false);
         return;
       }
+      if (offlinePlaybackRef.current) {
+        setError('Este download não pôde ser aberto. Apague-o e baixe o conteúdo novamente.');
+        setLoading(false);
+        return;
+      }
       if (scheduleRetry(episode)) return;
-      setError('Erro ao reproduzir: ' + String(err));
+      setError('Não foi possível iniciar este vídeo. Tente novamente ou escolha outro episódio.');
       setLoading(false);
     }
   };
@@ -624,26 +673,28 @@ export default function PlayerScreen() {
   };
 
   const handleDownload = useCallback(async () => {
-    if (!selectedEpisode || paramCategoryKey?.startsWith('iptv:')) return;
+    if (!selectedEpisode || isLive) return;
     setDownloadState('downloading');
+    setDownloadProgress({ writtenBytes: 0, totalBytes: null });
     try {
-      await downloadMedia(selectedEpisode.url, selectedEpisode.title);
+      await downloadMedia(selectedEpisode.url, selectedEpisode.title, setDownloadProgress);
       setDownloadState('downloaded');
     } catch (downloadError) {
       console.warn('Não foi possível baixar o conteúdo:', downloadError);
       setDownloadState('error');
     }
-  }, [paramCategoryKey, selectedEpisode]);
+  }, [isLive, selectedEpisode]);
 
   useEffect(() => {
     let cancelled = false;
     setDownloadState('idle');
-    if (!selectedEpisode || selectedEpisode.url.startsWith('file://') || paramCategoryKey?.startsWith('iptv:') || selectedEpisode.url.split('?')[0].toLowerCase().endsWith('.m3u8')) return;
+    setDownloadProgress(null);
+    if (!selectedEpisode || selectedEpisode.url.startsWith('file://') || isLive) return;
     void getDownloadedMedia(selectedEpisode.url).then((download) => {
       if (!cancelled && download) setDownloadState('downloaded');
     });
     return () => { cancelled = true; };
-  }, [paramCategoryKey, selectedEpisode]);
+  }, [isLive, selectedEpisode]);
 
   const handleResolutionRetry = () => {
     const failedResolution = failedResolutionRef.current;
@@ -686,15 +737,11 @@ export default function PlayerScreen() {
     [resolveSource]
   );
 
-  const handleEpisodePreview = useCallback((item: Episode) => {
-    setPreviewEpisode(item);
-  }, []);
-
   const renderEpisodeItem = useCallback(
     ({ item, index }: { item: Episode; index: number }) => (
-      <EpisodeItem item={item} index={index} onPress={handleEpisodePreview} />
+      <EpisodeItem item={item} index={index} onPress={handleEpisodePress} />
     ),
-    [handleEpisodePreview]
+    [handleEpisodePress]
   );
 
   const episodeKeyExtractor = useCallback((item: Episode, index: number) => `${index}-${item.url}`, []);
@@ -781,25 +828,30 @@ export default function PlayerScreen() {
             <Text style={styles.inlineResolvingText}>Lendo playlist...</Text>
           </View>
         )}
+        <View style={styles.contentCover}>
+          {paramPosterUrl ? (
+            <Image source={{ uri: paramPosterUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+          ) : (
+            <View style={[StyleSheet.absoluteFillObject, styles.contentCoverFallback]}>
+              <Ionicons name="film-outline" size={52} color="#48484d" />
+            </View>
+          )}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.4)', '#09090b']}
+            locations={[0, 0.48, 1]}
+            style={styles.contentCoverGradient}
+          />
+          <View style={styles.contentCoverText}>
+            <Text style={styles.contentCoverEyebrow}>
+              {listStack.length > 0 ? 'EPISÓDIOS · ' + currentList.title : 'ESCOLHA UMA TEMPORADA'}
+            </Text>
+            <Text style={styles.contentCoverTitle} numberOfLines={2}>
+              {paramTitle || currentList.title}
+            </Text>
+          </View>
+        </View>
         <FlatList
           data={currentList.entries}
-          ListHeaderComponent={previewEpisode ? (
-            <View style={styles.episodePreview}>
-              {previewEpisode.posterUrl || paramPosterUrl ? (
-                <Image source={{ uri: previewEpisode.posterUrl || paramPosterUrl }} style={styles.episodePreviewImage} resizeMode="cover" />
-              ) : (
-                <View style={[styles.episodePreviewImage, styles.episodePreviewFallback]}>
-                  <Text style={styles.episodeIndexText}>Prévia do episódio</Text>
-                </View>
-              )}
-              <View style={styles.episodePreviewInfo}>
-                <Text style={styles.episodePreviewTitle} numberOfLines={2}>{previewEpisode.title}</Text>
-                <TouchableOpacity style={styles.previewPlayButton} onPress={() => handleEpisodePress(previewEpisode)}>
-                  <Text style={styles.backText}>▶  Reproduzir episódio</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : null}
           keyExtractor={episodeKeyExtractor}
           contentContainerStyle={styles.episodeList}
           renderItem={renderEpisodeItem}
@@ -820,7 +872,11 @@ export default function PlayerScreen() {
           <Text style={styles.loadingText}>
             {resolving
               ? 'Lendo playlist...'
-              : retryAttempt > 0
+              // Só avisa "Reconectando" a partir da 2ª tentativa — a 1ª é
+              // silenciosa (continua mostrando "Carregando"), porque a
+              // maioria resolve sozinha em segundos e não vale alarmar o
+              // usuário por isso; só demora de verdade é que acende o aviso.
+              : retryAttempt > 1
                 ? `Reconectando... (tentativa ${retryAttempt}/${RETRY_DELAYS_MS.length})`
                 : 'Carregando vídeo...'}
           </Text>
@@ -832,21 +888,54 @@ export default function PlayerScreen() {
           player={player}
           contentFit="contain"
           nativeControls={true}
+          // TV ao vivo não tem duração real — a barra de progresso/tempo
+          // do player nativo não faz sentido aqui (iOS some os timecodes;
+          // Android some a barra inferior inteira, que é onde o tempo e a
+          // barra de progresso ficam).
+          showsTimecodes={!isLive}
+          buttonOptions={isLive ? { showBottomBar: false } : undefined}
         />
+      )}
+      {isLive && selectedEpisode && (
+        <View style={styles.liveBadge} pointerEvents="none">
+          <Animated.View style={[styles.liveDot, { opacity: liveDotOpacity }]} />
+          <Text style={styles.liveBadgeText}>AO VIVO</Text>
+        </View>
       )}
       <TouchableOpacity style={styles.backButton} onPress={handleBack}>
         <Text style={styles.backText}>← Voltar</Text>
       </TouchableOpacity>
       <View style={styles.topRightStack}>
-        {selectedEpisode && !selectedEpisode.url.startsWith('file://') && !paramCategoryKey?.startsWith('iptv:') && !selectedEpisode.url.split('?')[0].toLowerCase().endsWith('.m3u8') && (
+        {selectedEpisode && !selectedEpisode.url.startsWith('file://') && !isLive && (
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={
+              downloadState === 'downloading'
+                ? 'Download em andamento'
+                : downloadState === 'downloaded'
+                  ? 'Conteúdo baixado'
+                  : downloadState === 'error'
+                    ? 'Tentar download novamente'
+                    : 'Baixar conteúdo'
+            }
             style={styles.episodesButton}
             disabled={downloadState === 'downloading' || downloadState === 'downloaded'}
             onPress={() => void handleDownload()}
           >
-            <Text style={styles.backText}>
-              {downloadState === 'downloading' ? 'Baixando…' : downloadState === 'downloaded' ? '✓ Baixado' : downloadState === 'error' ? 'Tentar download' : '↓ Baixar'}
-            </Text>
+            <View style={styles.downloadButtonContent}>
+              <Ionicons
+                name={downloadState === 'downloaded' ? 'checkmark-circle-outline' : downloadState === 'error' ? 'refresh-outline' : 'download-outline'}
+                size={19}
+                color="#fff"
+              />
+              {downloadState === 'downloading' && (
+                <Text style={styles.backText}>
+                  {downloadProgress?.totalBytes
+                    ? Math.floor((downloadProgress.writtenBytes / downloadProgress.totalBytes) * 100) + '%'
+                    : formatDownloadBytes(downloadProgress?.writtenBytes ?? 0)}
+                </Text>
+              )}
+            </View>
           </TouchableOpacity>
         )}
         {streamUrl && (

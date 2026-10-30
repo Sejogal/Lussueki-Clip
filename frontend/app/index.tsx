@@ -1,14 +1,17 @@
 // app/index.tsx
 import CategoryRow from '@/components/CategoryRow';
+import CloudflareRow from '@/components/CloudflareRow';
 import ContinueWatchingRow from '@/components/ContinueWatchingRow';
 import FavoriteButton from '@/components/FavoriteButton';
 import FavoritesRow from '@/components/FavoritesRow';
 import HeroBanner from '@/components/HeroBanner';
 import MainBottomNav from '@/components/MainBottomNav';
 import PublicDomainRow from '@/components/PublicDomainRow';
+import { CLOUDFLARE_CATEGORIES } from '@/config/cloudflare';
 import { APP_NAME, CATEGORIES, CATEGORY_ORDER, CategoryKey } from '@/config/index';
 import { fetchCategoryContent } from '@/services/api';
 import { PUBLIC_DOMAIN_CATEGORIES } from '@/services/archiveOrg';
+import { CloudflareCategory, fetchCloudflareCategories } from '@/services/cloudflareCatalog';
 import { getCategoryDisplay } from '@/utils/categoryDisplay';
 import { PlaylistEntry } from '@/utils/playlist';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,6 +36,26 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
+  const [cloudflareCategories, setCloudflareCategories] = useState<CloudflareCategory[]>(CLOUDFLARE_CATEGORIES);
+
+  // Descobre as categorias Cloudflare publicadas na origem (ver
+  // services/cloudflareCatalog.ts) — nenhuma delas vem do código do app,
+  // por isso isso roda sempre, sem depender de nada fixo além da lista de
+  // fallback inicial (CLOUDFLARE_CATEGORIES, normalmente vazia).
+  useEffect(() => {
+    let cancelled = false;
+    void fetchCloudflareCategories().then((discovered) => {
+      if (cancelled || discovered.length === 0) return;
+      setCloudflareCategories((current) => {
+        const byKey = new Map(current.map((category) => [category.key, category]));
+        for (const category of discovered) byKey.set(category.key, category);
+        return [...byKey.values()];
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Busca global: quando o usuário digita, buscamos em todas as
   // categorias em paralelo e juntamos os resultados. Como cada
@@ -82,7 +105,7 @@ export default function HomeScreen() {
   const handleItemPress = useCallback(
     (item: SearchResult) => {
       router.push({
-        pathname: '/player',
+        pathname: '/preview',
         params: {
           streamUrl: item.url,
           title: item.title,
@@ -133,7 +156,9 @@ export default function HomeScreen() {
   type HomeListItem =
     | { type: 'legacy'; key: CategoryKey; config: (typeof CATEGORIES)[CategoryKey] }
     | { type: 'public-domain-header' }
-    | { type: 'public-domain'; category: (typeof PUBLIC_DOMAIN_CATEGORIES)[number] };
+    | { type: 'public-domain'; category: (typeof PUBLIC_DOMAIN_CATEGORIES)[number] }
+    | { type: 'cloudflare-header' }
+    | { type: 'cloudflare'; category: CloudflareCategory };
 
   const homeList = useMemo<HomeListItem[]>(() => {
     const legacyItems: HomeListItem[] = CATEGORY_ORDER.map((key) => ({
@@ -145,8 +170,19 @@ export default function HomeScreen() {
       type: 'public-domain',
       category,
     }));
-    return [...legacyItems, { type: 'public-domain-header' }, ...publicDomainItems];
-  }, []);
+    // Vazio até o manifesto (GET /catalog) trazer alguma categoria — não
+    // adiciona nenhuma fileira (nem cabeçalho) enquanto isso não acontecer.
+    const cloudflareItems: HomeListItem[] = cloudflareCategories.map((category) => ({
+      type: 'cloudflare',
+      category,
+    }));
+    return [
+      ...legacyItems,
+      { type: 'public-domain-header' },
+      ...publicDomainItems,
+      ...(cloudflareItems.length > 0 ? [{ type: 'cloudflare-header' } as HomeListItem, ...cloudflareItems] : []),
+    ];
+  }, [cloudflareCategories]);
 
   const renderHomeItem = useCallback(({ item }: { item: HomeListItem }) => {
     if (item.type === 'legacy') {
@@ -154,6 +190,16 @@ export default function HomeScreen() {
     }
     if (item.type === 'public-domain') {
       return <PublicDomainRow category={item.category} />;
+    }
+    if (item.type === 'cloudflare') {
+      return <CloudflareRow category={item.category} />;
+    }
+    if (item.type === 'cloudflare-header') {
+      return (
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionHeaderTitle}>Mais conteúdos</Text>
+        </View>
+      );
     }
     // 'public-domain-header'
     return (
@@ -169,6 +215,7 @@ export default function HomeScreen() {
   const homeKeyExtractor = useCallback((item: HomeListItem, index: number) => {
     if (item.type === 'legacy') return `legacy-${item.key}`;
     if (item.type === 'public-domain') return `pd-${item.category.key}`;
+    if (item.type === 'cloudflare') return `cf-${item.category.key}`;
     return `pd-header-${index}`;
   }, []);
 

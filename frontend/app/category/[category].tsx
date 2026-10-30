@@ -60,7 +60,7 @@ export default function CategoryDetailScreen() {
   const handlePress = useCallback((item: PlaylistEntry) => {
     if (!categoryKey) return;
     router.push({
-      pathname: '/player',
+      pathname: '/preview',
       params: {
         streamUrl: item.url,
         title: item.title,
