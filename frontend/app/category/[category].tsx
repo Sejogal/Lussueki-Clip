@@ -3,8 +3,8 @@ import { CATEGORIES, CategoryKey } from '@/config';
 import { fetchCategoryContent } from '@/services/api';
 import { PlaylistEntry } from '@/utils/playlist';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -53,14 +53,14 @@ export default function CategoryDetailScreen() {
     }
   }, [categoryKey]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     void load();
-  }, [load]);
+  }, [load]));
 
   const handlePress = useCallback((item: PlaylistEntry) => {
     if (!categoryKey) return;
     router.push({
-      pathname: '/player',
+      pathname: '/preview',
       params: {
         streamUrl: item.url,
         title: item.title,

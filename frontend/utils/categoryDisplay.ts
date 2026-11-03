@@ -1,6 +1,8 @@
 // utils/categoryDisplay.ts
 import { CATEGORIES, CategoryKey } from '@/config/index';
+import { CLOUDFLARE_CATEGORIES } from '@/config/cloudflare';
 import { PUBLIC_DOMAIN_CATEGORIES } from '@/services/archiveOrg';
+import { getCachedCloudflareCategories } from '@/services/cloudflareCatalog';
 
 /**
  * Resolve ícone/nome de uma categoria, seja ela uma das categorias
@@ -24,6 +26,15 @@ export function getCategoryDisplay(key?: string): { icon: string; label: string 
   const publicDomain = PUBLIC_DOMAIN_CATEGORIES.find((category) => category.key === key);
   if (publicDomain) {
     return { icon: publicDomain.icon, label: publicDomain.label };
+  }
+
+  // Lista fixa (config/cloudflare.ts, normalmente vazia) + o que já foi
+  // descoberto via manifesto (ver fetchCloudflareCategories).
+  const cloudflare = [...CLOUDFLARE_CATEGORIES, ...getCachedCloudflareCategories()].find(
+    (category) => category.key === key
+  );
+  if (cloudflare) {
+    return { icon: cloudflare.icon, label: cloudflare.label };
   }
 
   return { icon: '🎬', label: '' };

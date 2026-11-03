@@ -2,6 +2,7 @@
 import FavoriteButton from '@/components/FavoriteButton';
 import { CategoryKey } from '@/config/index';
 import { fetchCategoryContent } from '@/services/api';
+import { fetchCloudflareCatalog, fetchCloudflareCategories } from '@/services/cloudflareCatalog';
 import { getCategoryDisplay } from '@/utils/categoryDisplay';
 import { PlaylistEntry } from '@/utils/playlist';
 import { getHiResImage } from '@/utils/tmdb';
@@ -24,7 +25,9 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_HEIGHT = Math.round(SCREEN_WIDTH * 1.25);
 const AUTO_ADVANCE_MS = 6000;
 
-type FeaturedItem = PlaylistEntry & { categoryKey: CategoryKey };
+// categoryKey é string (não só CategoryKey) pra caber também categorias
+// Cloudflare, que são descobertas em tempo de execução.
+type FeaturedItem = PlaylistEntry & { categoryKey: string; isNew?: boolean };
 
 // Categorias com maior chance de ter pôster do TMDB (via paste.php), em
 // ordem de preferência — uma vira (no máximo) um slide do carrossel.
@@ -37,19 +40,28 @@ const FEATURED_CATEGORY_PRIORITY: CategoryKey[] = [
   'desenhos',
 ];
 
+// Conteúdo Cloudflare com `publishedAt` fica em destaque na Home por esse
+// tempo depois de publicado; passado isso, volta a aparecer só na fileira
+// normal da categoria (ver services/cloudflareCatalog.ts).
+const FEATURED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+// Limite de segurança — evita o carrossel ficar gigante se alguém
+// publicar dezenas de itens com data recente de uma vez.
+const MAX_CLOUDFLARE_FEATURED = 8;
+
 // ── Slide, extraído como componente memoizado ─────────────────────────
 // activeIndex muda a cada swipe/auto-advance (para as bolinhas). Sem
 // memoizar o slide, TODO slide re-renderiza a cada troca de página —
 // mesmo que só as bolinhas tenham mudado. React.memo evita isso.
 type SlideProps = {
   item: FeaturedItem;
-  onPress: (item: FeaturedItem) => void;
+  onOpenPreview: (item: FeaturedItem) => void;
+  onPlay: (item: FeaturedItem) => void;
 };
 
-const Slide = React.memo(function Slide({ item, onPress }: SlideProps) {
+const Slide = React.memo(function Slide({ item, onOpenPreview, onPlay }: SlideProps) {
   const categoryDisplay = getCategoryDisplay(item.categoryKey);
   return (
-    <TouchableOpacity activeOpacity={0.94} style={styles.slide} onPress={() => onPress(item)}>
+    <TouchableOpacity activeOpacity={0.94} style={styles.slide} onPress={() => onOpenPreview(item)}>
       <Image source={{ uri: getHiResImage(item.posterUrl, 'w780') }} style={styles.image} resizeMode="cover" />
 
       <LinearGradient
@@ -61,7 +73,9 @@ const Slide = React.memo(function Slide({ item, onPress }: SlideProps) {
       <View style={styles.content}>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>
-            {categoryDisplay.icon} EM DESTAQUE · {categoryDisplay.label.toUpperCase()}
+            {item.isNew
+              ? `🆕 NOVIDADE · ${categoryDisplay.label.toUpperCase()}`
+              : `${categoryDisplay.icon} EM DESTAQUE · ${categoryDisplay.label.toUpperCase()}`}
           </Text>
         </View>
 
@@ -69,7 +83,7 @@ const Slide = React.memo(function Slide({ item, onPress }: SlideProps) {
           {item.title}
         </Text>
 
-        <TouchableOpacity style={styles.playButton} onPress={() => onPress(item)}>
+        <TouchableOpacity style={styles.playButton} onPress={() => onPlay(item)}>
           <Text style={styles.playButtonText}>▶  Assistir</Text>
         </TouchableOpacity>
       </View>
@@ -100,7 +114,7 @@ export default function HeroBanner() {
     (async () => {
       // Busca um destaque de cada categoria em paralelo — cada uma que
       // tiver pôster disponível vira um slide do carrossel.
-      const results = await Promise.all(
+      const curatedResults = await Promise.all(
         FEATURED_CATEGORY_PRIORITY.map(async (categoryKey): Promise<FeaturedItem | null> => {
           try {
             const entries = await fetchCategoryContent(categoryKey);
@@ -114,9 +128,43 @@ export default function HeroBanner() {
           }
         })
       );
+      const curated = curatedResults.filter((item): item is FeaturedItem => item !== null);
+
+      // Conteúdo Cloudflare publicado há menos de 30 dias entra em
+      // destaque automaticamente — sem isso, cada novo upload ficaria
+      // "escondido" na fileira normal até alguém abrir a categoria.
+      let cloudflareFeatured: FeaturedItem[] = [];
+      try {
+        const categories = await fetchCloudflareCategories();
+        const now = Date.now();
+        const perCategory = await Promise.all(
+          categories.map(async (category): Promise<FeaturedItem[]> => {
+            try {
+              const entries = await fetchCloudflareCatalog(category.key);
+              return entries
+                .filter((entry) => {
+                  if (!entry.posterUrl || !entry.publishedAt) return false;
+                  const publishedTime = new Date(entry.publishedAt).getTime();
+                  return Number.isFinite(publishedTime) && now - publishedTime < FEATURED_WINDOW_MS;
+                })
+                .map((entry) => ({ ...entry, categoryKey: category.key, isNew: true }));
+            } catch {
+              return [];
+            }
+          })
+        );
+        cloudflareFeatured = perCategory
+          .flat()
+          .sort((a, b) => new Date(b.publishedAt!).getTime() - new Date(a.publishedAt!).getTime())
+          .slice(0, MAX_CLOUDFLARE_FEATURED);
+      } catch {
+        cloudflareFeatured = [];
+      }
 
       if (cancelled) return;
-      setItems(results.filter((item): item is FeaturedItem => item !== null));
+      // Novidades primeiro — é o conteúdo mais efêmero, faz sentido liderar
+      // o carrossel enquanto durar a janela de destaque.
+      setItems([...cloudflareFeatured, ...curated]);
       setLoading(false);
     })();
 
@@ -176,9 +224,24 @@ export default function HeroBanner() {
     [router]
   );
 
+  const openPreview = useCallback(
+    (item: FeaturedItem) => {
+      router.push({
+        pathname: '/preview',
+        params: {
+          streamUrl: item.url,
+          title: item.title,
+          posterUrl: item.posterUrl ?? '',
+          categoryKey: item.categoryKey,
+        },
+      });
+    },
+    [router]
+  );
+
   const renderItem = useCallback(
-    ({ item }: { item: FeaturedItem }) => <Slide item={item} onPress={goToPlayer} />,
-    [goToPlayer]
+    ({ item }: { item: FeaturedItem }) => <Slide item={item} onOpenPreview={openPreview} onPlay={goToPlayer} />,
+    [openPreview, goToPlayer]
   );
 
   if (loading) {

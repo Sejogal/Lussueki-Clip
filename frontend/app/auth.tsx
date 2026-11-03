@@ -174,6 +174,14 @@ export default function AuthScreen() {
               </View>
               <Ionicons name="chevron-forward" size={19} color="#77777d" />
             </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionRow, styles.actionRowSpacing]} onPress={() => router.push('/downloads')}>
+              <View style={[styles.actionIcon, styles.downloadIcon]}><Ionicons name="download" size={18} color="#8fd3ff" /></View>
+              <View style={styles.actionTextGroup}>
+                <Text style={styles.actionTitle}>Meus downloads</Text>
+                <Text style={styles.actionSubtitle}>Conteúdos salvos neste aparelho</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={19} color="#77777d" />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.section}>
@@ -271,6 +279,11 @@ export default function AuthScreen() {
             <TouchableOpacity disabled={submitting} onPress={() => setIsRegistering((value) => !value)}>
               <Text style={styles.switchText}>{isRegistering ? 'Já tenho uma conta' : 'Criar uma conta'}</Text>
             </TouchableOpacity>
+            {/* Downloads ficam no aparelho, não na conta — continuam
+                acessíveis mesmo sem login. */}
+            <TouchableOpacity disabled={submitting} onPress={() => router.push('/downloads')}>
+              <Text style={styles.guestDownloadsLink}>Ver meus downloads neste aparelho</Text>
+            </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
       )}
@@ -308,8 +321,10 @@ const styles = StyleSheet.create({
   sectionTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginBottom: 11 },
   sectionCount: { color: '#96969d', fontSize: 12, marginBottom: 11 },
   actionRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#151517', borderRadius: 9, padding: 13, minHeight: 66 },
+  actionRowSpacing: { marginTop: 10 },
   actionIcon: { width: 38, height: 38, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   favoriteIcon: { backgroundColor: '#302023' },
+  downloadIcon: { backgroundColor: '#1a2a33' },
   actionTextGroup: { flex: 1, marginLeft: 12 },
   actionTitle: { color: '#f5f5f6', fontSize: 14, fontWeight: '700' },
   actionSubtitle: { color: '#96969d', fontSize: 12, marginTop: 3 },
@@ -332,4 +347,5 @@ const styles = StyleSheet.create({
   primaryButton: { backgroundColor: '#d91620', borderRadius: 8, minHeight: 52, justifyContent: 'center', alignItems: 'center', marginTop: 20 },
   primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '800' },
   switchText: { color: '#f1f1f2', textAlign: 'center', fontSize: 14, fontWeight: '700', marginTop: 20, padding: 8 },
+  guestDownloadsLink: { color: '#8e8e93', textAlign: 'center', fontSize: 13, marginTop: 4, padding: 8 },
 });

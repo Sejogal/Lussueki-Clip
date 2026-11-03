@@ -4,7 +4,8 @@ import { CategoryConfig, CategoryKey } from '@/config/index';
 import { fetchCategoryContent } from '@/services/api';
 import { PlaylistEntry } from '@/utils/playlist';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
@@ -65,7 +66,7 @@ function CategoryRow({ categoryKey, config }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let cancelled = false;
 
     (async () => {
@@ -86,14 +87,14 @@ function CategoryRow({ categoryKey, config }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [categoryKey]);
+  }, [categoryKey]));
 
   // useCallback: a função só é recriada se categoryKey/router mudarem,
   // então PosterItem (memoizado) não re-renderiza por causa dela.
   const handlePress = useCallback(
     (item: PlaylistEntry) => {
       router.push({
-        pathname: '/player',
+        pathname: '/preview',
         params: {
           streamUrl: item.url,
           title: item.title,

@@ -12,7 +12,8 @@
 //    tocar um item, busca os metadados dele e escolhe o melhor arquivo
 //    de vídeo disponível pra streaming.
 
-import { PlaylistEntry } from '@/utils/playlist';
+import { PlaylistEntry, stripHtml } from '@/utils/playlist';
+import { filterFailedContent, readDeviceCache, writeDeviceCache } from '@/services/deviceCache';
 
 const ADVANCED_SEARCH_URL = 'https://archive.org/advancedsearch.php';
 const METADATA_URL = 'https://archive.org/metadata';
@@ -77,33 +78,51 @@ export const PUBLIC_DOMAIN_CATEGORIES: PublicDomainCategory[] = [
 type ArchiveSearchDoc = {
   identifier: string;
   title?: string;
+  // O archive.org devolve string normalmente, mas às vezes um array
+  // (campos multi-valor) — tratamos os dois casos.
+  description?: string | string[];
 };
 
+function firstDescription(description: string | string[] | undefined): string | undefined {
+  const raw = Array.isArray(description) ? description[0] : description;
+  if (!raw) return undefined;
+  const text = stripHtml(raw);
+  return text.length > 0 ? text : undefined;
+}
+
 export async function searchArchiveOrg(query: string, rows = 24): Promise<PlaylistEntry[]> {
+  const cacheKey = `archive-search:${query}:${rows}`;
+  const cached = await readDeviceCache<PlaylistEntry[]>(cacheKey);
+  if (cached?.fresh) return filterFailedContent(cached.value);
   const url =
     `${ADVANCED_SEARCH_URL}?q=${encodeURIComponent(query)}` +
-    `&fl[]=identifier&fl[]=title` +
+    `&fl[]=identifier&fl[]=title&fl[]=description` +
     `&sort[]=downloads+desc` +
     `&rows=${rows}&page=1&output=json`;
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ao buscar no archive.org`);
-  }
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status} ao buscar no archive.org`);
 
-  const data = await response.json();
-  const docs: ArchiveSearchDoc[] = data?.response?.docs ?? [];
-
-  return docs
-    .filter((doc) => !!doc.identifier)
-    .map((doc) => ({
+    const data = await response.json();
+    const docs: ArchiveSearchDoc[] = data?.response?.docs ?? [];
+    const entries = docs
+      .filter((doc) => !!doc.identifier)
+      .map((doc) => ({
       title: doc.title || doc.identifier,
       url: `${ARCHIVE_ITEM_PREFIX}${doc.identifier}`,
       // O archive.org gera automaticamente uma thumbnail pra qualquer
       // item a partir desse endpoint — não precisa buscar metadados
       // só pra mostrar o pôster na lista.
       posterUrl: `https://archive.org/services/img/${doc.identifier}`,
+      synopsis: firstDescription(doc.description),
     }));
+    await writeDeviceCache(cacheKey, entries);
+    return filterFailedContent(entries);
+  } catch (error) {
+    if (cached) return filterFailedContent(cached.value);
+    throw error;
+  }
 }
 
 type ArchiveMetadataFile = {

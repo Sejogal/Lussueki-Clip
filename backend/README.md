@@ -49,3 +49,31 @@ python -m unittest discover -s tests -v
 
 O app Expo usa `EXPO_PUBLIC_LK_CLIP_API_URL=http://IP_DO_COMPUTADOR:8000`.
 Em celular fisico, inicie a API com `--host 0.0.0.0` e mantenha computador e celular na mesma rede Wi-Fi.
+
+## Catálogo Cloudflare
+
+As categorias são **descobertas pelo app**, não fixas no código — publicar
+um catálogo novo é só fazer upload do conteúdo na origem; o app encontra
+sozinho na próxima vez que abrir.
+
+1. **Manifesto de categorias** — configure `LK_CLIP_CLOUDFLARE_CATEGORIES_URL`
+   com a URL de um JSON assim:
+   ```json
+   [{ "key": "filmes-exclusivos", "label": "Exclusivos", "icon": "⚡" }]
+   ```
+   `GET /catalog` repassa esse manifesto; é dele que o app lê quais fileiras
+   mostrar na Home.
+2. **Conteúdo de cada categoria** — configure `LK_CLIP_CLOUDFLARE_CATALOG_URL`
+   com a URL de origem. Use `{category}` quando a origem separar o conteúdo
+   por categoria, por exemplo: `https://seu-dominio.workers.dev/catalog/{category}`.
+   `GET /catalog/{category}` repassa a resposta da origem (JSON ou M3U) — o
+   `key` de cada categoria do manifesto é o que substitui `{category}`.
+   Formato JSON preferido para cada item:
+   ```json
+   [{ "title": "...", "url": "...", "posterUrl": "...", "synopsis": "..." }]
+   ```
+   (`synopsis` é opcional.)
+
+Nenhuma das duas URLs precisa ser de fato um Worker Cloudflare — qualquer
+origem HTTP pública que devolva esse JSON funciona (ex: Cloudflare Pages
+com ficheiros estáticos, sem escrever código nenhum).
