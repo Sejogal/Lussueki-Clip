@@ -3,7 +3,7 @@
     "name": "Lussueki-CLIP",
     "slug": "LK-CLIP",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/app-icon.png",
     "scheme": "lkclip",
     "userInterfaceStyle": "automatic",

@@ -1,3 +1,4 @@
+import AppBrand from '@/components/AppBrand';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
@@ -52,6 +53,7 @@ export default function SettingsScreen() {
           <Ionicons name="arrow-back" size={21} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerText}>
+          <AppBrand />
           <Text style={styles.title}>Definições</Text>
           <Text style={styles.subtitle}>Sobre o aplicativo</Text>
         </View>
@@ -116,7 +118,7 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#09090b' },
+  container: { flex: 1, width: '100%', maxWidth: 1600, alignSelf: 'center', backgroundColor: '#09090b' },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#2a2a2e' },
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: '#19191c' },
   headerText: { marginLeft: 13 },

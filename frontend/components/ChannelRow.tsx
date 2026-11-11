@@ -1,7 +1,7 @@
 // components/ChannelRow.tsx
 import { useRouter } from 'expo-router';
 import React, { useCallback } from 'react';
-import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { IptvCategory, IptvChannel } from '@/utils/iptv';
 // import FavoriteButton from '@/components/ui/FavoriteButton';
 
@@ -15,16 +15,19 @@ const LOGO_SIZE = 84;
 type ChannelItemProps = {
   channel: IptvChannel;
   onPress: (channel: IptvChannel) => void;
+  logoSize: number;
+  largeScreen: boolean;
 };
 
-const ChannelItem = React.memo(function ChannelItem({ channel, onPress }: ChannelItemProps) {
+const ChannelItem = React.memo(function ChannelItem({ channel, onPress, logoSize, largeScreen }: ChannelItemProps) {
+  const [focused, setFocused] = React.useState(false);
   return (
-    <TouchableOpacity activeOpacity={0.75} style={styles.channelCard} onPress={() => onPress(channel)}>
+    <TouchableOpacity focusable activeOpacity={0.75} style={[styles.channelCard, { width: logoSize }, focused && styles.channelCardFocused]} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onPress={() => onPress(channel)}>
       <View style={styles.logoWrapper}>
         {channel.posterUrl ? (
-          <Image source={{ uri: channel.posterUrl }} style={styles.logo} resizeMode="contain" />
+          <Image source={{ uri: channel.posterUrl }} style={[styles.logo, { width: logoSize, height: logoSize }]} resizeMode="contain" />
         ) : (
-          <View style={[styles.logo, styles.logoFallback]}>
+          <View style={[styles.logo, { width: logoSize, height: logoSize }, styles.logoFallback]}>
             <Text style={styles.logoFallbackText}>📺</Text>
           </View>
         )}
@@ -37,7 +40,7 @@ const ChannelItem = React.memo(function ChannelItem({ channel, onPress }: Channe
           variant="overlay"
         /> */}
       </View>
-      <Text style={styles.channelTitle} numberOfLines={2}>
+      <Text style={[styles.channelTitle, largeScreen && styles.channelTitleLarge]} numberOfLines={2}>
         {channel.title}
       </Text>
     </TouchableOpacity>
@@ -46,6 +49,9 @@ const ChannelItem = React.memo(function ChannelItem({ channel, onPress }: Channe
 
 function ChannelRow({ category }: Props) {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const largeScreen = width >= 900;
+  const logoSize = largeScreen ? 120 : LOGO_SIZE;
 
   const handlePress = useCallback(
     (channel: IptvChannel) => {
@@ -63,8 +69,8 @@ function ChannelRow({ category }: Props) {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: IptvChannel }) => <ChannelItem channel={item} onPress={handlePress} />,
-    [handlePress]
+    ({ item }: { item: IptvChannel }) => <ChannelItem channel={item} onPress={handlePress} logoSize={logoSize} largeScreen={largeScreen} />,
+    [handlePress, logoSize, largeScreen]
   );
 
   const keyExtractor = useCallback((item: IptvChannel, index: number) => `${category.group}-${index}-${item.url}`, [
@@ -86,14 +92,14 @@ function ChannelRow({ category }: Props) {
         contentContainerStyle={styles.listContent}
         renderItem={renderItem}
         getItemLayout={(_, index) => ({
-          length: LOGO_SIZE + 12,
-          offset: (LOGO_SIZE + 12) * index,
+          length: logoSize + 12,
+          offset: (logoSize + 12) * index,
           index,
         })}
         initialNumToRender={8}
         maxToRenderPerBatch={8}
         windowSize={5}
-        removeClippedSubviews
+        removeClippedSubviews={!largeScreen}
       />
     </View>
   );
@@ -129,6 +135,7 @@ const styles = StyleSheet.create({
     width: LOGO_SIZE,
     marginRight: 12,
   },
+  channelCardFocused: { backgroundColor: '#27272b', borderColor: '#fff', borderWidth: 2, borderRadius: 10, transform: [{ scale: 1.05 }], zIndex: 2 },
   logoWrapper: {
     position: 'relative',
   },
@@ -168,6 +175,7 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontWeight: '800',
   },
+  channelTitleLarge: { fontSize: 15, lineHeight: 19, fontWeight: '600' },
   channelTitle: {
     color: '#d1d1d6',
     fontSize: 11,

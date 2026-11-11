@@ -56,7 +56,7 @@ const EpisodeItem = React.memo(function EpisodeItem({
   onPress: (item: PlaylistEntry) => void;
 }) {
   return (
-    <TouchableOpacity style={styles.episodeItem} onPress={() => onPress(item)}>
+    <TouchableOpacity focusable style={styles.episodeItem} onPress={() => onPress(item)}>
       {item.posterUrl ? (
         <Image source={{ uri: item.posterUrl }} style={styles.episodeThumb} />
       ) : (
@@ -241,9 +241,11 @@ export default function PreviewScreen() {
                 </Text>
               </View>
             ) : null}
-            <Text style={styles.title} numberOfLines={3}>
-              {title}
-            </Text>
+            <View style={styles.titlePanel}>
+              <Text style={styles.title} numberOfLines={3}>
+                {title}
+              </Text>
+            </View>
             <TouchableOpacity
               accessibilityRole="button"
               style={[styles.playButton, assistirDisabled && styles.playButtonDisabled]}
@@ -261,9 +263,11 @@ export default function PreviewScreen() {
             <Text style={styles.compactEyebrow} numberOfLines={1}>
               {listStack.length > 0 ? `EPISÓDIOS · ${currentList!.title}` : 'ESCOLHA UMA TEMPORADA'}
             </Text>
-            <Text style={styles.compactTitle} numberOfLines={2}>
-              {title}
-            </Text>
+            <View style={styles.compactTitlePanel}>
+              <Text style={styles.compactTitle} numberOfLines={2}>
+                {title}
+              </Text>
+            </View>
           </View>
         )}
       </View>
@@ -275,7 +279,7 @@ export default function PreviewScreen() {
       )}
 
       <View style={styles.topRow}>
-        <TouchableOpacity accessibilityLabel="Voltar" style={styles.roundButton} onPress={handleBack}>
+        <TouchableOpacity focusable accessibilityLabel="Voltar" style={styles.roundButton} onPress={handleBack}>
           <Ionicons name="arrow-back" size={21} color="#fff" />
         </TouchableOpacity>
         <FavoriteButton item={{ title, url: streamUrl, posterUrl, categoryKey }} variant="floating" size={20} />
@@ -358,12 +362,23 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+  titlePanel: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    backgroundColor: 'rgba(0,0,0,0.82)',
+    borderLeftWidth: 4,
+    borderLeftColor: '#e50914',
+    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    marginBottom: 10,
+  },
   title: {
     color: '#fff',
-    fontSize: 28,
-    fontWeight: '800',
-    marginBottom: 22,
-    textShadowColor: 'rgba(0,0,0,0.7)',
+    fontSize: 21,
+    lineHeight: 26,
+    fontWeight: '900',
+    textShadowColor: 'rgba(0,0,0,0.9)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
   },
@@ -388,11 +403,22 @@ const styles = StyleSheet.create({
     bottom: 16,
   },
   compactEyebrow: { color: '#ff777d', fontSize: 11, fontWeight: '800', letterSpacing: 0.5, marginBottom: 6 },
+  compactTitlePanel: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    backgroundColor: 'rgba(0,0,0,0.82)',
+    borderLeftWidth: 4,
+    borderLeftColor: '#e50914',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
   compactTitle: {
     color: '#fff',
-    fontSize: 21,
-    fontWeight: '800',
-    textShadowColor: 'rgba(0,0,0,0.7)',
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: '900',
+    textShadowColor: 'rgba(0,0,0,0.9)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
   },

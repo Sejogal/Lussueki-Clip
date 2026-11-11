@@ -1,6 +1,4 @@
-import { StyleSheet, Dimensions } from "react-native";
-
-const { width, height } = Dimensions.get('window');
+import { StyleSheet } from "react-native";
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
@@ -9,7 +7,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  video: { width, height: height * 0.85, alignSelf: 'center' },
+  video: { width: '100%', height: '100%', alignSelf: 'center' },
   backButton: {
     position: 'absolute',
     top: 50,
@@ -93,10 +91,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    borderTopWidth: 2,
+    borderTopColor: '#e50914',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
   },
-  titleText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  titleText: { color: '#fff', fontSize: 17, lineHeight: 22, fontWeight: '800', textShadowColor: '#000', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   episodeHeader: {
     flexDirection: 'row',
     alignItems: 'center',

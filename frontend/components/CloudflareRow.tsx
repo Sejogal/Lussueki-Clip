@@ -13,6 +13,7 @@ import {
     Text,
     TouchableOpacity,
     View,
+    useWindowDimensions,
 } from 'react-native';
 
 type Props = {
@@ -27,16 +28,20 @@ type PosterItemProps = {
   categoryKey: string;
   icon: string;
   onPress: (item: PlaylistEntry) => void;
+  posterWidth: number;
+  posterHeight: number;
+  largeScreen: boolean;
 };
 
-const PosterItem = React.memo(function PosterItem({ item, categoryKey, icon, onPress }: PosterItemProps) {
+const PosterItem = React.memo(function PosterItem({ item, categoryKey, icon, onPress, posterWidth, posterHeight, largeScreen }: PosterItemProps) {
+  const [focused, setFocused] = useState(false);
   return (
-    <TouchableOpacity activeOpacity={0.75} style={styles.posterCard} onPress={() => onPress(item)}>
+    <TouchableOpacity focusable activeOpacity={0.75} style={[styles.posterCard, { width: posterWidth }, focused && styles.posterCardFocused]} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onPress={() => onPress(item)}>
       <View style={styles.posterWrapper}>
         {item.posterUrl ? (
-          <Image source={{ uri: item.posterUrl }} style={styles.poster} resizeMode="cover" />
+          <Image source={{ uri: item.posterUrl }} style={[styles.poster, { width: posterWidth, height: posterHeight }]} resizeMode="cover" />
         ) : (
-          <View style={[styles.poster, styles.posterFallback]}>
+          <View style={[styles.poster, { width: posterWidth, height: posterHeight }, styles.posterFallback]}>
             <Text style={styles.posterFallbackIcon}>{icon}</Text>
           </View>
         )}
@@ -45,7 +50,7 @@ const PosterItem = React.memo(function PosterItem({ item, categoryKey, icon, onP
           variant="overlay"
         />
       </View>
-      <Text style={styles.posterTitle} numberOfLines={2}>
+      <Text style={[styles.posterTitle, largeScreen && styles.posterTitleLarge]} numberOfLines={2}>
         {item.title}
       </Text>
     </TouchableOpacity>
@@ -54,6 +59,10 @@ const PosterItem = React.memo(function PosterItem({ item, categoryKey, icon, onP
 
 function CloudflareRow({ category }: Props) {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const largeScreen = width >= 900;
+  const posterWidth = largeScreen ? 174 : POSTER_WIDTH;
+  const posterHeight = Math.round(posterWidth * 1.42);
   const [items, setItems] = useState<PlaylistEntry[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -99,9 +108,9 @@ function CloudflareRow({ category }: Props) {
 
   const renderItem = useCallback(
     ({ item }: { item: PlaylistEntry }) => (
-      <PosterItem item={item} categoryKey={category.key} icon={category.icon} onPress={handlePress} />
+      <PosterItem item={item} categoryKey={category.key} icon={category.icon} onPress={handlePress} posterWidth={posterWidth} posterHeight={posterHeight} largeScreen={largeScreen} />
     ),
-    [category.key, category.icon, handlePress]
+    [category.key, category.icon, handlePress, posterWidth, posterHeight, largeScreen]
   );
 
   const keyExtractor = useCallback(
@@ -123,7 +132,7 @@ function CloudflareRow({ category }: Props) {
       </View>
 
       {loading ? (
-        <View style={styles.loadingRow}>
+        <View style={[styles.loadingRow, { height: posterHeight } ]}>
           <ActivityIndicator size="small" color="#e50914" />
         </View>
       ) : (
@@ -135,14 +144,14 @@ function CloudflareRow({ category }: Props) {
           contentContainerStyle={styles.listContent}
           renderItem={renderItem}
           getItemLayout={(_, index) => ({
-            length: POSTER_WIDTH + 12,
-            offset: (POSTER_WIDTH + 12) * index,
+            length: posterWidth + 12,
+            offset: (posterWidth + 12) * index,
             index,
           })}
           initialNumToRender={6}
           maxToRenderPerBatch={6}
           windowSize={5}
-          removeClippedSubviews
+          removeClippedSubviews={!largeScreen}
         />
       )}
     </View>
@@ -159,9 +168,11 @@ const styles = StyleSheet.create({
   loadingRow: { height: POSTER_HEIGHT, justifyContent: 'center', paddingLeft: 16 },
   listContent: { paddingHorizontal: 16, gap: 12 },
   posterCard: { width: POSTER_WIDTH, marginRight: 12 },
+  posterCardFocused: { backgroundColor: '#27272b', borderColor: '#fff', borderWidth: 2, borderRadius: 10, transform: [{ scale: 1.05 }], zIndex: 2 },
   posterWrapper: { position: 'relative' },
   poster: { width: POSTER_WIDTH, height: POSTER_HEIGHT, borderRadius: 8, backgroundColor: '#1c1c1e' },
   posterFallback: { justifyContent: 'center', alignItems: 'center' },
   posterFallbackIcon: { fontSize: 32 },
   posterTitle: { color: '#d1d1d6', fontSize: 12, marginTop: 6, lineHeight: 15 },
+  posterTitleLarge: { fontSize: 16, lineHeight: 21, fontWeight: '600' },
 });

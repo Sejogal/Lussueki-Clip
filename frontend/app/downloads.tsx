@@ -1,3 +1,4 @@
+import AppBrand from '@/components/AppBrand';
 import { listDownloads, removeDownload } from '@/services/downloads';
 import type { DownloadedMedia } from '@/services/downloads';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,10 +27,11 @@ export default function DownloadsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity accessibilityLabel="Voltar" style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity focusable accessibilityLabel="Voltar" style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={21} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerText}>
+          <AppBrand />
           <Text style={styles.title}>Downloads</Text>
           <Text style={styles.subtitle}>Disponíveis apenas neste app</Text>
         </View>
@@ -41,14 +43,14 @@ export default function DownloadsScreen() {
         ListEmptyComponent={<Text style={styles.emptyText}>Ainda não há conteúdos baixados.</Text>}
         renderItem={({ item }) => (
           <View style={styles.row}>
-            <TouchableOpacity accessibilityRole="button" style={styles.playButton} onPress={() => play(item)}>
+            <TouchableOpacity focusable accessibilityRole="button" style={styles.playButton} onPress={() => play(item)}>
               <Ionicons name="play" size={19} color="#fff" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.itemText} onPress={() => play(item)}>
               <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
               <Text style={styles.itemDate}>Guardado em {new Date(item.savedAt).toLocaleDateString()}</Text>
             </TouchableOpacity>
-            <TouchableOpacity accessibilityLabel={'Apagar ' + item.title} style={styles.removeButton} onPress={() => handleRemove(item)}>
+            <TouchableOpacity focusable accessibilityLabel={'Apagar ' + item.title} style={styles.removeButton} onPress={() => handleRemove(item)}>
               <Ionicons name="trash-outline" size={19} color="#ff777d" />
             </TouchableOpacity>
           </View>
@@ -59,7 +61,7 @@ export default function DownloadsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#09090b' },
+  container: { flex: 1, width: '100%', maxWidth: 1600, alignSelf: 'center', backgroundColor: '#09090b' },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#2a2a2e' },
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: '#19191c' },
   headerText: { marginLeft: 13 },

@@ -1,5 +1,6 @@
 import { Text, ScrollView, TouchableOpacity, StyleSheet, View, Platform } from "react-native";
 import FavoritesRow from '@/components/FavoritesRow';
+import AppBrand from '@/components/AppBrand';
 import { router, useLocalSearchParams, useRouter } from 'expo-router';
 import MainBottomNav from '@/components/MainBottomNav';
 
@@ -8,6 +9,7 @@ export default function favoritos() {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
+                <AppBrand />
                 <Text style={styles.title}>Favoritos</Text>
                 <Text style={styles.subtitle}>Encontre o teu entretenimento favorito.</Text>
             </View>
@@ -20,7 +22,7 @@ export default function favoritos() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#000' },
+    container: { flex: 1, width: '100%', maxWidth: 1600, alignSelf: 'center', backgroundColor: '#000' },
     header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 54 : 44, paddingBottom: 16 },
     title: { color: '#fff', fontSize: 28, fontWeight: '800' },
     subtitle: { color: '#8e8e93', fontSize: 14, marginTop: 4 },

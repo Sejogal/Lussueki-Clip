@@ -14,7 +14,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
     ActivityIndicator,
     Animated,
-    Dimensions,
     FlatList,
     Image,
     StyleSheet,
@@ -24,7 +23,6 @@ import {
 } from 'react-native';
 import styles from '../assets/styles/player';
 
-const { width, height } = Dimensions.get('window');
 
 const USER_AGENT = 'VLC/3.0.18 LibVLC/3.0.18';
 
@@ -48,7 +46,7 @@ type EpisodeItemProps = {
 
 const EpisodeItem = React.memo(function EpisodeItem({ item, index, onPress }: EpisodeItemProps) {
   return (
-    <TouchableOpacity style={styles.episodeItem} onPress={() => onPress(item)}>
+    <TouchableOpacity focusable style={styles.episodeItem} onPress={() => onPress(item)}>
       {item.posterUrl ? (
         <Image source={{ uri: item.posterUrl }} style={styles.episodeThumb} />
       ) : (
@@ -766,7 +764,7 @@ export default function PlayerScreen() {
       <View style={styles.container}>
         <View style={styles.centerContent}>
           <Text style={styles.errorText}>⚠️ URL do stream não encontrada</Text>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity focusable style={styles.backButton} onPress={() => router.back()}>
             <Text style={styles.backText}>← Voltar</Text>
           </TouchableOpacity>
         </View>
@@ -788,7 +786,7 @@ export default function PlayerScreen() {
                 <Text style={styles.backText}>↻ Tentar novamente</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.backButtonInline} onPress={() => router.back()}>
+            <TouchableOpacity focusable style={styles.backButtonInline} onPress={() => router.back()}>
               <Text style={styles.backText}>← Voltar</Text>
             </TouchableOpacity>
           </View>
@@ -804,7 +802,7 @@ export default function PlayerScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.episodeHeader}>
-          <TouchableOpacity style={styles.backButtonInline} onPress={handleBack}>
+          <TouchableOpacity focusable style={styles.backButtonInline} onPress={handleBack}>
             <Text style={styles.backText}>← Voltar</Text>
           </TouchableOpacity>
           <Text style={styles.episodeHeaderTitle} numberOfLines={1}>
@@ -902,7 +900,7 @@ export default function PlayerScreen() {
           <Text style={styles.liveBadgeText}>AO VIVO</Text>
         </View>
       )}
-      <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+      <TouchableOpacity focusable style={styles.backButton} onPress={handleBack}>
         <Text style={styles.backText}>← Voltar</Text>
       </TouchableOpacity>
       <View style={styles.topRightStack}>

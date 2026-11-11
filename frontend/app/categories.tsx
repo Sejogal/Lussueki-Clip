@@ -1,4 +1,5 @@
 import CategoryRow from '@/components/CategoryRow';
+import AppBrand from '@/components/AppBrand';
 import MainBottomNav from '@/components/MainBottomNav';
 import { CATEGORIES, CATEGORY_ORDER } from '@/config';
 import React, { useCallback } from 'react';
@@ -13,6 +14,7 @@ export default function CategoriesScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        <AppBrand />
         <Text style={styles.title}>Categorias</Text>
         <Text style={styles.subtitle}>Encontre filmes, séries, animes e mais.</Text>
       </View>
@@ -23,7 +25,7 @@ export default function CategoriesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1, width: '100%', maxWidth: 1600, alignSelf: 'center', backgroundColor: '#000' },
   header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 54 : 44, paddingBottom: 16 },
   title: { color: '#fff', fontSize: 28, fontWeight: '800' },
   subtitle: { color: '#8e8e93', fontSize: 14, marginTop: 4 },

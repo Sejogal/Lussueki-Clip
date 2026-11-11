@@ -1,5 +1,6 @@
 // app/iptv/index.tsx
 import ChannelRow from '@/components/ChannelRow';
+import AppBrand from '@/components/AppBrand';
 import MainBottomNav from '@/components/MainBottomNav';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchIptvCatalog } from '@/services/iptv';
@@ -17,10 +18,13 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
 export default function IptvScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const largeScreen = width >= 900;
   const { session, isLoading: authLoading } = useAuth();
   const [categories, setCategories] = useState<IptvCategory[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,19 +90,20 @@ export default function IptvScreen() {
   const renderSearchResult = useCallback(
     ({ item }: { item: IptvChannel }) => (
       <TouchableOpacity
+        focusable
         activeOpacity={0.7}
-        style={styles.searchResultCard}
+        style={[styles.searchResultCard, largeScreen && styles.searchResultCardLarge]}
         onPress={() => handleChannelPress(item)}
       >
         {item.posterUrl ? (
-          <Image source={{ uri: item.posterUrl }} style={styles.searchResultLogo} resizeMode="contain" />
+          <Image source={{ uri: item.posterUrl }} style={[styles.searchResultLogo, largeScreen && styles.searchResultLogoLarge]} resizeMode="contain" />
         ) : (
-          <View style={[styles.searchResultLogo, styles.searchResultLogoFallback]}>
+          <View style={[styles.searchResultLogo, largeScreen && styles.searchResultLogoLarge, styles.searchResultLogoFallback]}>
             <Text style={{ fontSize: 18 }}>📺</Text>
           </View>
         )}
         <View style={styles.searchResultText}>
-          <Text style={styles.searchResultTitle} numberOfLines={1}>
+          <Text style={[styles.searchResultTitle, largeScreen && styles.searchResultTitleLarge]} numberOfLines={1}>
             {item.title}
           </Text>
           <Text style={styles.searchResultCategory}>{item.group}</Text>
@@ -106,7 +111,7 @@ export default function IptvScreen() {
         <Ionicons name="chevron-forward" size={18} color="#666" />
       </TouchableOpacity>
     ),
-    [handleChannelPress]
+    [handleChannelPress, largeScreen]
   );
 
   const isSearchMode = searchQuery.trim().length >= 2;
@@ -121,14 +126,15 @@ export default function IptvScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 54 : largeScreen ? 20 : 44 }]}>
+        <AppBrand />
         <Text style={styles.headerTitle}>📺 TV ao vivo</Text>
       </View>
 
-      <View style={styles.searchContainer}>
+      <View style={[styles.searchContainer, largeScreen && styles.searchContainerLarge]}>
         <Ionicons name="search" size={20} color="#8e8e93" style={styles.searchIcon} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, largeScreen && styles.searchInputLarge]}
           placeholder="Buscar canal..."
           placeholderTextColor="#8e8e93"
           value={searchQuery}
@@ -137,7 +143,7 @@ export default function IptvScreen() {
           returnKeyType="search"
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
+          <TouchableOpacity focusable onPress={() => setSearchQuery('')}>
             <Ionicons name="close-circle" size={20} color="#8e8e93" />
           </TouchableOpacity>
         )}
@@ -152,7 +158,7 @@ export default function IptvScreen() {
         <View style={styles.centerContent}>
           <Ionicons name="cloud-offline" size={48} color="#ff6b6b" />
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={load}>
+          <TouchableOpacity focusable style={styles.retryButton} onPress={load}>
             <Text style={styles.retryText}>Tentar novamente</Text>
           </TouchableOpacity>
         </View>
@@ -187,6 +193,9 @@ export default function IptvScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
+    maxWidth: 1600,
+    alignSelf: 'center',
     backgroundColor: '#000',
   },
   centerContent: {
@@ -203,7 +212,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '800',
     color: '#fff',
   },
@@ -216,6 +225,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 10,
   },
+  searchContainerLarge: { minHeight: 54, borderRadius: 12, marginHorizontal: 28 },
+  searchInputLarge: { height: 52, fontSize: 18 },
   searchIcon: {
     marginRight: 8,
   },
@@ -274,6 +285,8 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#2c2c2e',
   },
+  searchResultCardLarge: { minHeight: 76, padding: 12, borderRadius: 12 },
+  searchResultLogoLarge: { width: 60, height: 60 },
   searchResultLogoFallback: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -282,6 +295,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
   },
+  searchResultTitleLarge: { fontSize: 17 },
   searchResultTitle: {
     color: '#fff',
     fontSize: 14,

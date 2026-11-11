@@ -2,8 +2,8 @@
 import FavoriteButton from '@/components/FavoriteButton';
 import { FavoriteItem, useFavorites } from '@/contexts/FavoritesContext';
 import { useRouter } from 'expo-router';
-import React, { useCallback } from 'react';
-import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 
 const POSTER_WIDTH = 120;
 const POSTER_HEIGHT = 170;
@@ -13,22 +13,26 @@ const POSTER_HEIGHT = 170;
 type FavoriteCardProps = {
   item: FavoriteItem;
   onPress: (item: FavoriteItem) => void;
+  posterWidth: number;
+  posterHeight: number;
+  largeScreen: boolean;
 };
 
-const FavoriteCard = React.memo(function FavoriteCard({ item, onPress }: FavoriteCardProps) {
+const FavoriteCard = React.memo(function FavoriteCard({ item, onPress, posterWidth, posterHeight, largeScreen }: FavoriteCardProps) {
+  const [focused, setFocused] = useState(false);
   return (
-    <TouchableOpacity activeOpacity={0.75} style={styles.posterCard} onPress={() => onPress(item)}>
+    <TouchableOpacity focusable activeOpacity={0.75} style={[styles.posterCard, { width: posterWidth }, focused && styles.posterCardFocused]} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onPress={() => onPress(item)}>
       <View style={styles.posterWrapper}>
         {item.posterUrl ? (
-          <Image source={{ uri: item.posterUrl }} style={styles.poster} resizeMode="cover" />
+          <Image source={{ uri: item.posterUrl }} style={[styles.poster, { width: posterWidth, height: posterHeight }]} resizeMode="cover" />
         ) : (
-          <View style={[styles.poster, styles.posterFallback]}>
+          <View style={[styles.poster, { width: posterWidth, height: posterHeight }, styles.posterFallback]}>
             <Text style={{ fontSize: 28 }}>🎬</Text>
           </View>
         )}
         <FavoriteButton item={item} variant="overlay" />
       </View>
-      <Text style={styles.posterTitle} numberOfLines={2}>
+      <Text style={[styles.posterTitle, largeScreen && styles.posterTitleLarge]} numberOfLines={2}>
         {item.title}
       </Text>
     </TouchableOpacity>
@@ -37,6 +41,10 @@ const FavoriteCard = React.memo(function FavoriteCard({ item, onPress }: Favorit
 
 export default function FavoritesRow() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const largeScreen = width >= 900;
+  const posterWidth = largeScreen ? 174 : POSTER_WIDTH;
+  const posterHeight = Math.round(posterWidth * 1.42);
   const { favorites } = useFavorites();
 
   const handlePress = useCallback(
@@ -58,8 +66,8 @@ export default function FavoritesRow() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: FavoriteItem }) => <FavoriteCard item={item} onPress={handlePress} />,
-    [handlePress]
+    ({ item }: { item: FavoriteItem }) => <FavoriteCard item={item} onPress={handlePress} posterWidth={posterWidth} posterHeight={posterHeight} largeScreen={largeScreen} />,
+    [handlePress, posterWidth, posterHeight, largeScreen]
   );
 
   const keyExtractor = useCallback((item: FavoriteItem) => item.url, []);
@@ -83,14 +91,14 @@ export default function FavoritesRow() {
         contentContainerStyle={styles.listContent}
         renderItem={renderItem}
         getItemLayout={(_, index) => ({
-          length: POSTER_WIDTH + 12,
-          offset: (POSTER_WIDTH + 12) * index,
+          length: posterWidth + 12,
+          offset: (posterWidth + 12) * index,
           index,
         })}
         initialNumToRender={6}
         maxToRenderPerBatch={6}
         windowSize={5}
-        removeClippedSubviews
+        removeClippedSubviews={!largeScreen}
       />
     </View>
   );
@@ -123,6 +131,7 @@ const styles = StyleSheet.create({
     width: POSTER_WIDTH,
     marginRight: 12,
   },
+  posterCardFocused: { backgroundColor: '#27272b', borderColor: '#fff', borderWidth: 2, borderRadius: 10, transform: [{ scale: 1.05 }], zIndex: 2 },
   posterWrapper: {
     position: 'relative',
   },
@@ -136,6 +145,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  posterTitleLarge: { fontSize: 16, lineHeight: 21, fontWeight: '600' },
   posterTitle: {
     color: '#d1d1d6',
     fontSize: 12,

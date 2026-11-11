@@ -7,7 +7,9 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <FavoritesProvider>
-        <Stack screenOptions={{ headerShown: false }} />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="player" options={{ orientation: 'landscape' }} />
+        </Stack>
       </FavoritesProvider>
     </AuthProvider>
   );
