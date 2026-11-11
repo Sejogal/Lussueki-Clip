@@ -24,8 +24,8 @@ export default function favoritos() {
 const styles = StyleSheet.create({
     container: { flex: 1, width: '100%', maxWidth: 1600, alignSelf: 'center', backgroundColor: '#000' },
     header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 54 : 44, paddingBottom: 16 },
-    title: { color: '#fff', fontSize: 28, fontWeight: '800' },
-    subtitle: { color: '#8e8e93', fontSize: 14, marginTop: 4 },
+    title: { color: '#fff', fontSize: 20, lineHeight: 26, fontWeight: '800', marginTop: 3 },
+    subtitle: { color: '#a1a1a8', fontSize: 13, lineHeight: 18, marginTop: 3 },
     list: { paddingBottom: 14 },
     bottomComponent: {
         position: 'absolute',

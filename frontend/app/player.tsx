@@ -170,6 +170,19 @@ export default function PlayerScreen() {
     return value ? String(value) : undefined;
   }, [params.categoryKey]);
 
+  const episodeQueue = useMemo((): Episode[] => {
+    const value = Array.isArray(params.episodeQueue) ? params.episodeQueue[0] : params.episodeQueue;
+    if (!value || typeof value !== 'string') return [];
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return Array.isArray(parsed)
+        ? parsed.filter((entry): entry is Episode => Boolean(entry && typeof entry.title === 'string' && typeof entry.url === 'string'))
+        : [];
+    } catch {
+      return [];
+    }
+  }, [params.episodeQueue]);
+
   const resumePosition = useMemo(() => {
     if (!params.positionSeconds) return 0;
     const value = Array.isArray(params.positionSeconds) ? params.positionSeconds[0] : params.positionSeconds;
@@ -199,7 +212,9 @@ export default function PlayerScreen() {
   // teríamos uma "mídia final", checamos se ela não é, na verdade, mais
   // uma playlist — e se for, resolvemos de novo, até achar vídeo de
   // verdade ou uma lista com mais de um item (aí mostramos o seletor).
-  const [currentList, setCurrentList] = useState<ListLevel | null>(null);
+  const [currentList, setCurrentList] = useState<ListLevel | null>(() =>
+    episodeQueue.length > 1 ? { title: paramTitle || 'Episódios', entries: episodeQueue } : null
+  );
   const [listStack, setListStack] = useState<ListLevel[]>([]);
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [downloadState, setDownloadState] = useState<'idle' | 'downloading' | 'downloaded' | 'error'>('idle');
@@ -744,6 +759,9 @@ export default function PlayerScreen() {
 
   const episodeKeyExtractor = useCallback((item: Episode, index: number) => `${index}-${item.url}`, []);
 
+  const selectedEpisodeIndex = currentList?.entries.findIndex((episode) => episode.url === selectedEpisode?.url) ?? -1;
+  const nextEpisode = selectedEpisodeIndex >= 0 ? currentList?.entries[selectedEpisodeIndex + 1] : undefined;
+
   const handleBack = () => {
     if (listStack.length > 0) {
       // Sobe um nível na hierarquia em vez de sair do player.
@@ -891,7 +909,7 @@ export default function PlayerScreen() {
           // Android some a barra inferior inteira, que é onde o tempo e a
           // barra de progresso ficam).
           showsTimecodes={!isLive}
-          buttonOptions={isLive ? { showBottomBar: false } : undefined}
+          buttonOptions={isLive ? { showBottomBar: false } : { showNext: Boolean(nextEpisode) }}
         />
       )}
       {isLive && selectedEpisode && (

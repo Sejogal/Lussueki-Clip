@@ -53,7 +53,9 @@ function normalizePosterUrl(url?: string): string | undefined {
   if (value.startsWith('/t/p/')) return `https://image.tmdb.org${value}`;
   if (value.startsWith('t/p/')) return `https://image.tmdb.org/${value}`;
   if (value.startsWith('www.')) return `https://${value}`;
-  if (/^http:\/\//i.test(value)) return value.replace(/^http:\/\//i, 'https://');
+  // Mantém o protocolo de hosts de terceiros: alguns servidores só servem
+  // a imagem por HTTP. Forçar HTTPS fazia a capa falhar aqui mesmo quando a
+  // mesma URL era exibida corretamente na sinopse.
   if (/^(image\.tmdb\.org|www\.themoviedb\.org)\//i.test(value)) return `https://${value}`;
   return value;
 }
@@ -75,7 +77,9 @@ const Slide = React.memo(function Slide({ item, width, height, onOpenPreview, on
   const originalPosterUrl = item.posterUrl?.trim().replace(/&amp;/g, '&');
   const normalizedPosterUrl = normalizePosterUrl(item.posterUrl);
   const normalizedFallbackUrl = normalizePosterUrl(item.fallbackPosterUrl);
-  const [imageUri, setImageUri] = useState(normalizedPosterUrl ?? normalizedFallbackUrl);
+  // Use the same high-resolution TMDB URL as the synopsis screen.
+  const preferredPosterUrl = getHiResImage(normalizedPosterUrl, 'w780');
+  const [imageUri, setImageUri] = useState(preferredPosterUrl ?? normalizedPosterUrl ?? normalizedFallbackUrl);
   const [originalAttempted, setOriginalAttempted] = useState(false);
   const [fallbackAttempted, setFallbackAttempted] = useState(false);
   const [alternateAttempted, setAlternateAttempted] = useState(false);
@@ -128,7 +132,7 @@ const Slide = React.memo(function Slide({ item, width, height, onOpenPreview, on
           {item.title}
         </Text>
 
-        <TouchableOpacity focusable style={styles.playButton} onPress={() => onPlay(item)}>
+        <TouchableOpacity focusable style={styles.playButton} onPress={(event) => { event.stopPropagation(); onPlay(item); }}>
           <Text style={styles.playButtonText}>▶  Assistir</Text>
         </TouchableOpacity>
       </View>
@@ -147,7 +151,7 @@ const Slide = React.memo(function Slide({ item, width, height, onOpenPreview, on
 export default function HeroBanner() {
   const router = useRouter();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const SCREEN_WIDTH = Math.min(windowWidth, 1280);
+  const SCREEN_WIDTH = Math.min(windowWidth, 1600);
   const HERO_HEIGHT = Math.min(windowHeight * 0.72, Math.max(320, SCREEN_WIDTH * (windowWidth > windowHeight ? 0.58 : 1.05)));
   const [items, setItems] = useState<FeaturedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -257,21 +261,6 @@ export default function HeroBanner() {
 
   const keyExtractor = useCallback((item: FeaturedItem) => `${item.categoryKey}-${item.url}`, []);
 
-  const goToPlayer = useCallback(
-    (item: FeaturedItem) => {
-      router.push({
-        pathname: '/player',
-        params: {
-          streamUrl: item.url,
-          title: item.title,
-          posterUrl: item.posterUrl ?? '',
-          categoryKey: item.categoryKey,
-        },
-      });
-    },
-    [router]
-  );
-
   const openPreview = useCallback(
     (item: FeaturedItem) => {
       router.push({
@@ -288,8 +277,8 @@ export default function HeroBanner() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: FeaturedItem }) => <Slide item={item} width={SCREEN_WIDTH} height={HERO_HEIGHT} onOpenPreview={openPreview} onPlay={goToPlayer} />,
-    [openPreview, goToPlayer, SCREEN_WIDTH, HERO_HEIGHT]
+    ({ item }: { item: FeaturedItem }) => <Slide item={item} width={SCREEN_WIDTH} height={HERO_HEIGHT} onOpenPreview={openPreview} onPlay={openPreview} />,
+    [openPreview, SCREEN_WIDTH, HERO_HEIGHT]
   );
 
   if (loading) {

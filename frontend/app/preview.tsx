@@ -102,10 +102,16 @@ export default function PreviewScreen() {
   const resolveTokenRef = useRef(0);
 
   const goToPlayer = useCallback(
-    (entryTitle: string, entryUrl: string) => {
+    (entryTitle: string, entryUrl: string, episodeQueue?: PlaylistEntry[]) => {
       router.push({
         pathname: '/player',
-        params: { streamUrl: entryUrl, title: entryTitle, posterUrl: posterUrl ?? '', categoryKey },
+        params: {
+          streamUrl: entryUrl,
+          title: entryTitle,
+          posterUrl: posterUrl ?? '',
+          categoryKey,
+          ...(episodeQueue && episodeQueue.length > 1 ? { episodeQueue: JSON.stringify(episodeQueue) } : {}),
+        },
       });
     },
     [router, posterUrl, categoryKey]
@@ -134,7 +140,10 @@ export default function PreviewScreen() {
             setResolvedLeaf({ title: label, url });
             setCoverResolving(false);
           } else {
-            goToPlayer(label, url);
+            const entries = currentListRef.current?.entries ?? [];
+            const selectedIndex = entries.findIndex((entry) => entry.url === url || entry.title === label);
+            const episodeQueue = selectedIndex >= 0 ? entries.slice(selectedIndex) : undefined;
+            goToPlayer(label, url, episodeQueue);
           }
           return;
         }
