@@ -1,6 +1,7 @@
 // services/iptv.ts
 import { IPTV_SOURCE_URL } from '@/config/iptv';
 import { filterFailedContent, readDeviceCache, writeDeviceCache } from '@/services/deviceCache';
+import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 import { groupIptvChannels, IptvCategory, parseIptvPlaylist } from '@/utils/iptv';
 
 // Cache em memória: o arquivo de origem tem milhares de canais, então
@@ -32,7 +33,9 @@ export async function fetchIptvCatalog(): Promise<IptvCategory[]> {
 
     console.log('📡 Buscando catálogo IPTV de:', IPTV_SOURCE_URL);
     try {
-      const response = await fetch(IPTV_SOURCE_URL);
+      // Lista com milhares de canais — pode legitimamente demorar mais
+      // que o tempo limite por omissão numa rede lenta.
+      const response = await fetchWithTimeout(IPTV_SOURCE_URL, {}, 25_000);
       if (!response.ok) throw new Error(`HTTP ${response.status} ao buscar a playlist IPTV`);
       const text = await response.text();
       const channels = parseIptvPlaylist(text, IPTV_SOURCE_URL);

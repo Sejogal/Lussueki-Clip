@@ -5,6 +5,7 @@ import MainBottomNav from '@/components/MainBottomNav';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchIptvCatalog } from '@/services/iptv';
 import { IptvCategory, IptvChannel } from '@/utils/iptv';
+import { normalizePosterUrl } from '@/utils/tmdb';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -96,7 +97,7 @@ export default function IptvScreen() {
         onPress={() => handleChannelPress(item)}
       >
         {item.posterUrl ? (
-          <Image source={{ uri: item.posterUrl }} style={[styles.searchResultLogo, largeScreen && styles.searchResultLogoLarge]} resizeMode="contain" />
+          <Image source={{ uri: normalizePosterUrl(item.posterUrl) }} style={[styles.searchResultLogo, largeScreen && styles.searchResultLogoLarge]} resizeMode="contain" />
         ) : (
           <View style={[styles.searchResultLogo, largeScreen && styles.searchResultLogoLarge, styles.searchResultLogoFallback]}>
             <Text style={{ fontSize: 18 }}>📺</Text>
@@ -127,7 +128,6 @@ export default function IptvScreen() {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 54 : largeScreen ? 20 : 44 }]}>
-        <AppBrand />
         <Text style={styles.headerTitle}>📺 TV ao vivo</Text>
       </View>
 

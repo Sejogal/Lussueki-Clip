@@ -15,6 +15,7 @@ import { PUBLIC_DOMAIN_CATEGORIES } from '@/services/archiveOrg';
 import { CloudflareCategory, fetchCloudflareCategories } from '@/services/cloudflareCatalog';
 import { getCategoryDisplay } from '@/utils/categoryDisplay';
 import { PlaylistEntry } from '@/utils/playlist';
+import { normalizePosterUrl } from '@/utils/tmdb';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -134,7 +135,7 @@ export default function HomeScreen() {
           onPress={() => handleItemPress(item)}
         >
           {item.posterUrl ? (
-            <Image source={{ uri: item.posterUrl }} style={[styles.searchResultPoster, largeScreen && styles.searchResultPosterLarge]} />
+            <Image source={{ uri: normalizePosterUrl(item.posterUrl) }} style={[styles.searchResultPoster, largeScreen && styles.searchResultPosterLarge]} />
           ) : (
             <View style={[styles.searchResultPoster, largeScreen && styles.searchResultPosterLarge, styles.searchResultPosterFallback]}>
               <Text style={{ fontSize: 20 }}>{categoryDisplay.icon}</Text>

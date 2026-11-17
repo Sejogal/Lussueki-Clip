@@ -77,6 +77,7 @@ class WatchRequest(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     source_url: str = Field(min_length=1, max_length=2000)
     category: str | None = Field(default=None, max_length=80)
+    poster_url: str | None = Field(default=None, max_length=2000)
     content_key: str | None = Field(default=None, max_length=300)
     # Progresso da reprodução — envie periodicamente durante o play (ex:
     # a cada 10-15s) e ao pausar/sair do player.
@@ -84,7 +85,7 @@ class WatchRequest(BaseModel):
     duration_seconds: int | None = Field(default=None, ge=1)
     count_view: bool = True
 
-    @field_validator("title", "source_url", "category", "content_key")
+    @field_validator("title", "source_url", "category", "poster_url", "content_key")
     @classmethod
     def strip_text_fields(cls, value: str | None) -> str | None:
         if value is None:
@@ -100,6 +101,7 @@ class WatchResponse(BaseModel):
     title: str
     category: str | None
     source_url: str
+    poster_url: str | None
     position_seconds: int
     duration_seconds: int | None
     view_count: int

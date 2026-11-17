@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useCallback } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { IptvCategory, IptvChannel } from '@/utils/iptv';
+import { normalizePosterUrl } from '@/utils/tmdb';
 // import FavoriteButton from '@/components/ui/FavoriteButton';
 
 type Props = {
@@ -25,7 +26,7 @@ const ChannelItem = React.memo(function ChannelItem({ channel, onPress, logoSize
     <TouchableOpacity focusable activeOpacity={0.75} style={[styles.channelCard, { width: logoSize }, focused && styles.channelCardFocused]} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onPress={() => onPress(channel)}>
       <View style={styles.logoWrapper}>
         {channel.posterUrl ? (
-          <Image source={{ uri: channel.posterUrl }} style={[styles.logo, { width: logoSize, height: logoSize }]} resizeMode="contain" />
+          <Image source={{ uri: normalizePosterUrl(channel.posterUrl) }} style={[styles.logo, { width: logoSize, height: logoSize }]} resizeMode="contain" />
         ) : (
           <View style={[styles.logo, { width: logoSize, height: logoSize }, styles.logoFallback]}>
             <Text style={styles.logoFallbackText}>📺</Text>

@@ -1,6 +1,7 @@
 // components/FavoritesRow.tsx
 import FavoriteButton from '@/components/FavoriteButton';
 import { FavoriteItem, useFavorites } from '@/contexts/FavoritesContext';
+import { normalizePosterUrl } from '@/utils/tmdb';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
@@ -24,7 +25,7 @@ const FavoriteCard = React.memo(function FavoriteCard({ item, onPress, posterWid
     <TouchableOpacity focusable activeOpacity={0.75} style={[styles.posterCard, { width: posterWidth }, focused && styles.posterCardFocused]} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onPress={() => onPress(item)}>
       <View style={styles.posterWrapper}>
         {item.posterUrl ? (
-          <Image source={{ uri: item.posterUrl }} style={[styles.poster, { width: posterWidth, height: posterHeight }]} resizeMode="cover" />
+          <Image source={{ uri: normalizePosterUrl(item.posterUrl) }} style={[styles.poster, { width: posterWidth, height: posterHeight }]} resizeMode="cover" />
         ) : (
           <View style={[styles.poster, { width: posterWidth, height: posterHeight }, styles.posterFallback]}>
             <Text style={{ fontSize: 28 }}>🎬</Text>

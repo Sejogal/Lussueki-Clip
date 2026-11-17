@@ -3,6 +3,7 @@ import FavoriteButton from '@/components/FavoriteButton';
 import { CategoryConfig, CategoryKey } from '@/config/index';
 import { fetchCategoryContent } from '@/services/api';
 import { PlaylistEntry } from '@/utils/playlist';
+import { normalizePosterUrl } from '@/utils/tmdb';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
@@ -47,7 +48,7 @@ const PosterItem = React.memo(function PosterItem({ item, categoryKey, icon, onP
     <TouchableOpacity focusable activeOpacity={0.75} style={[styles.posterCard, { width: posterWidth }, focused && styles.posterCardFocused]} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onPress={() => onPress(item)}>
       <View style={styles.posterWrapper}>
         {item.posterUrl ? (
-          <Image source={{ uri: item.posterUrl }} style={[styles.poster, { width: posterWidth, height: posterHeight }]} resizeMode="cover" />
+          <Image source={{ uri: normalizePosterUrl(item.posterUrl) }} style={[styles.poster, { width: posterWidth, height: posterHeight }]} resizeMode="cover" />
         ) : (
           <View style={[styles.poster, { width: posterWidth, height: posterHeight }, styles.posterFallback]}>
             <Text style={styles.posterFallbackIcon}>{icon}</Text>

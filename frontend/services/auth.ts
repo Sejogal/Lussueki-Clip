@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getApiUrl } from '@/config/api';
+import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 
 const SESSION_STORAGE_KEY = '@lk-clip/auth-session';
 
@@ -28,6 +29,7 @@ export type WatchPayload = {
   title: string;
   category?: string;
   source_url: string;
+  poster_url?: string | null;
   content_key: string;
   position_seconds?: number;
   duration_seconds?: number | null;
@@ -61,14 +63,18 @@ export class ApiError extends Error {
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${getApiUrl()}${path}`, {
+    // 20s, não os 12s por omissão: o backend (Render, plano gratuito)
+    // "adormece" sem pedidos e demora a acordar no primeiro pedido depois
+    // de inativo — um limite mais apertado aqui transformava esse
+    // arranque lento, que resolve sozinho, num erro visível ao utilizador.
+    response = await fetchWithTimeout(`${getApiUrl()}${path}`, {
       ...options,
       headers: {
         Accept: 'application/json',
         ...(options.body ? { 'Content-Type': 'application/json' } : {}),
         ...options.headers,
       },
-    });
+    }, 20_000);
   } catch (error) {
     if (error instanceof Error) throw error;
     throw new Error('Não foi possível contactar o backend.');

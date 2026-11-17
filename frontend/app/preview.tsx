@@ -22,7 +22,7 @@ import FavoriteButton from '@/components/FavoriteButton';
 import { ARCHIVE_ITEM_PREFIX, getArchiveOrgPlayableUrl } from '@/services/archiveOrg';
 import { getCategoryDisplay } from '@/utils/categoryDisplay';
 import { fetchPlaylistEntries, isDirectMediaUrl, PlaylistEntry } from '@/utils/playlist';
-import { getHiResImage } from '@/utils/tmdb';
+import { getHiResImage, normalizePosterUrl } from '@/utils/tmdb';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -58,7 +58,7 @@ const EpisodeItem = React.memo(function EpisodeItem({
   return (
     <TouchableOpacity focusable style={styles.episodeItem} onPress={() => onPress(item)}>
       {item.posterUrl ? (
-        <Image source={{ uri: item.posterUrl }} style={styles.episodeThumb} />
+        <Image source={{ uri: normalizePosterUrl(item.posterUrl) }} style={styles.episodeThumb} />
       ) : (
         <View style={styles.episodeIndexBadge}>
           <Text style={styles.episodeIndexText}>{index + 1}</Text>
@@ -84,7 +84,7 @@ export default function PreviewScreen() {
   const synopsis = paramToString(params.synopsis) || undefined;
 
   const categoryDisplay = useMemo(() => getCategoryDisplay(categoryKey || undefined), [categoryKey]);
-  const backdropUrl = useMemo(() => getHiResImage(posterUrl, 'w780'), [posterUrl]);
+  const backdropUrl = useMemo(() => getHiResImage(normalizePosterUrl(posterUrl), 'w780'), [posterUrl]);
 
   // ── Resolução recursiva (mesma ideia do player.tsx) ──────────────────
   const [coverResolving, setCoverResolving] = useState(true);

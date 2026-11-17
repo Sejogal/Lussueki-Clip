@@ -15,6 +15,7 @@
 // nível quando necessário).
 
 import { filterFailedContent, readDeviceCache, writeDeviceCache } from '@/services/deviceCache';
+import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 
 export type PlaylistEntry = {
   title: string;
@@ -226,7 +227,7 @@ export async function fetchPlaylistEntries(url: string): Promise<PlaylistEntry[]
   if (cached?.fresh) return filterFailedContent(cached.value);
 
   try {
-    const response = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    const response = await fetchWithTimeout(url, { headers: { 'User-Agent': USER_AGENT } });
     if (!response.ok) throw new Error(`HTTP ${response.status} ao buscar ${url}`);
 
     const text = await response.text();

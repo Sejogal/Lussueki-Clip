@@ -5,7 +5,7 @@ import { fetchCategoryContent } from '@/services/api';
 import { fetchCloudflareCatalog, fetchCloudflareCategories } from '@/services/cloudflareCatalog';
 import { getCategoryDisplay } from '@/utils/categoryDisplay';
 import { PlaylistEntry } from '@/utils/playlist';
-import { getHiResImage } from '@/utils/tmdb';
+import { getHiResImage, normalizePosterUrl } from '@/utils/tmdb';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -46,20 +46,6 @@ const FEATURED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 // publicar dezenas de itens com data recente de uma vez.
 const MAX_CLOUDFLARE_FEATURED = 8;
 
-function normalizePosterUrl(url?: string): string | undefined {
-  const value = url?.trim().replace(/&amp;/g, '&');
-  if (!value) return undefined;
-  if (value.startsWith('//')) return `https:${value}`;
-  if (value.startsWith('/t/p/')) return `https://image.tmdb.org${value}`;
-  if (value.startsWith('t/p/')) return `https://image.tmdb.org/${value}`;
-  if (value.startsWith('www.')) return `https://${value}`;
-  // Mantém o protocolo de hosts de terceiros: alguns servidores só servem
-  // a imagem por HTTP. Forçar HTTPS fazia a capa falhar aqui mesmo quando a
-  // mesma URL era exibida corretamente na sinopse.
-  if (/^(image\.tmdb\.org|www\.themoviedb\.org)\//i.test(value)) return `https://${value}`;
-  return value;
-}
-
 // ── Slide, extraído como componente memoizado ─────────────────────────
 // activeIndex muda a cada swipe/auto-advance (para as bolinhas). Sem
 // memoizar o slide, TODO slide re-renderiza a cada troca de página —
@@ -74,35 +60,23 @@ type SlideProps = {
 
 const Slide = React.memo(function Slide({ item, width, height, onOpenPreview, onPlay }: SlideProps) {
   const categoryDisplay = getCategoryDisplay(item.categoryKey);
-  const originalPosterUrl = item.posterUrl?.trim().replace(/&amp;/g, '&');
+  // Mesmo tratamento comprovado nas fileiras (CategoryRow etc.): um URL
+  // já normalizado para HTTPS, sem reencaminhar para a versão HTTP
+  // original em caso de falha (essa tentativa falhava sempre da mesma
+  // forma no Android, só adiava o resultado final).
   const normalizedPosterUrl = normalizePosterUrl(item.posterUrl);
   const normalizedFallbackUrl = normalizePosterUrl(item.fallbackPosterUrl);
-  // Use the same high-resolution TMDB URL as the synopsis screen.
-  const preferredPosterUrl = getHiResImage(normalizedPosterUrl, 'w780');
-  const [imageUri, setImageUri] = useState(preferredPosterUrl ?? normalizedPosterUrl ?? normalizedFallbackUrl);
-  const [originalAttempted, setOriginalAttempted] = useState(false);
-  const [fallbackAttempted, setFallbackAttempted] = useState(false);
-  const [alternateAttempted, setAlternateAttempted] = useState(false);
+  const preferredPosterUrl = getHiResImage(normalizedPosterUrl, 'w780') ?? normalizedPosterUrl;
+  const [usingFallback, setUsingFallback] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
-  const alternateImageUri = getHiResImage(normalizedPosterUrl, 'w500');
+  const imageUri = usingFallback ? normalizedFallbackUrl : preferredPosterUrl;
   const handleImageError = useCallback(() => {
-    if (!originalAttempted && originalPosterUrl && originalPosterUrl !== imageUri) {
-      setOriginalAttempted(true);
-      setImageUri(originalPosterUrl);
-      return;
-    }
-    if (!alternateAttempted && alternateImageUri && alternateImageUri !== imageUri) {
-      setAlternateAttempted(true);
-      setImageUri(alternateImageUri);
-      return;
-    }
-    if (!fallbackAttempted && normalizedFallbackUrl && normalizedFallbackUrl !== imageUri) {
-      setFallbackAttempted(true);
-      setImageUri(normalizedFallbackUrl);
+    if (!usingFallback && normalizedFallbackUrl && normalizedFallbackUrl !== imageUri) {
+      setUsingFallback(true);
       return;
     }
     setImageFailed(true);
-  }, [alternateAttempted, alternateImageUri, fallbackAttempted, imageUri, normalizedFallbackUrl, originalAttempted, originalPosterUrl]);
+  }, [usingFallback, normalizedFallbackUrl, imageUri]);
   return (
     <TouchableOpacity focusable activeOpacity={0.94} style={[styles.slide, { width, height }]} onPress={() => onOpenPreview(item)}>
       {imageUri && !imageFailed ? (
@@ -338,7 +312,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   image: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   imageFallback: {
     backgroundColor: '#171719',
@@ -347,7 +321,7 @@ const styles = StyleSheet.create({
   },
   imageFallbackIcon: { color: '#5b5b60', fontSize: 54, fontWeight: '800' },
   gradient: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   content: {
     position: 'absolute',

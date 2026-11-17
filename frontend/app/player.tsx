@@ -6,9 +6,11 @@ import { markContentAsFailed } from '@/services/deviceCache';
 import { downloadMedia, getDownloadedMedia } from '@/services/downloads';
 import type { DownloadProgress } from '@/services/downloads';
 import { fetchPlaylistEntries, isDirectMediaUrl, PlaylistEntry } from '@/utils/playlist';
+import { normalizePosterUrl } from '@/utils/tmdb';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { useVideoPlayer, VideoPlayer, VideoView } from 'expo-video';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -48,7 +50,7 @@ const EpisodeItem = React.memo(function EpisodeItem({ item, index, onPress }: Ep
   return (
     <TouchableOpacity focusable style={styles.episodeItem} onPress={() => onPress(item)}>
       {item.posterUrl ? (
-        <Image source={{ uri: item.posterUrl }} style={styles.episodeThumb} />
+        <Image source={{ uri: normalizePosterUrl(item.posterUrl) }} style={styles.episodeThumb} />
       ) : (
         <View style={styles.episodeIndexBadge}>
           <Text style={styles.episodeIndexText}>{index + 1}</Text>
@@ -219,6 +221,26 @@ export default function PlayerScreen() {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [downloadState, setDownloadState] = useState<'idle' | 'downloading' | 'downloaded' | 'error'>('idle');
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
+
+  // O ecrã do player serve dois estados bem diferentes: escolher
+  // temporada/episódio (lista vertical, pensada para retrato) e ver o
+  // vídeo (melhor em paisagem). Bloquear a rota inteira a 'landscape'
+  // (como estava em app/_layout.tsx) forçava a lista de episódios a abrir
+  // já rodada, onde a FlatList vertical não tinha como funcionar direito.
+  // Por isso o bloqueio agora segue o estado real: retrato para escolher,
+  // paisagem só depois de um episódio ser mesmo selecionado para tocar.
+  useEffect(() => {
+    const lock = selectedEpisode
+      ? ScreenOrientation.OrientationLock.LANDSCAPE
+      : ScreenOrientation.OrientationLock.PORTRAIT_UP;
+    void ScreenOrientation.lockAsync(lock);
+  }, [selectedEpisode]);
+
+  useEffect(() => {
+    return () => {
+      void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    };
+  }, []);
 
   // TV ao vivo (canais IPTV) ou qualquer stream .m3u8 — sem duração real,
   // então a barra de progresso do player nativo não faz sentido pra esse
@@ -467,6 +489,7 @@ export default function PlayerScreen() {
         title: selectedEpisode.title || paramTitle || 'Reproduzindo...',
         category: paramCategoryKey,
         source_url: streamUrl,
+        poster_url: normalizePosterUrl(selectedEpisode.posterUrl) ?? normalizePosterUrl(paramPosterUrl) ?? null,
         content_key: getContentKey(streamUrl, selectedEpisode.title),
         position_seconds: progress.position,
         duration_seconds: progress.duration,
@@ -479,7 +502,7 @@ export default function PlayerScreen() {
       clearInterval(interval);
       saveProgress();
     };
-  }, [paramCategoryKey, paramTitle, player, selectedEpisode, streamUrl]);
+  }, [paramCategoryKey, paramPosterUrl, paramTitle, player, selectedEpisode, streamUrl]);
 
   // Ref para a função de retry poder ser chamada de dentro do listener de
   // status (definido antes de attemptPlayback existir) sem closures obsoletas.
@@ -520,6 +543,7 @@ export default function PlayerScreen() {
               title: episode.title || paramTitle || 'Reproduzindo...',
               category: paramCategoryKey,
               source_url: streamUrl,
+              poster_url: normalizePosterUrl(episode.posterUrl) ?? normalizePosterUrl(paramPosterUrl) ?? null,
               content_key: contentKey,
               position_seconds: 0,
               duration_seconds: undefined,
@@ -551,7 +575,7 @@ export default function PlayerScreen() {
     return () => {
       subscription.remove();
     };
-  }, [paramCategoryKey, paramTitle, player, streamUrl]);
+  }, [paramCategoryKey, paramPosterUrl, paramTitle, player, streamUrl]);
 
   // Contador de tentativas automáticas (qualquer tipo de erro de
   // reprodução) — reseta toda vez que um episódio novo é selecionado ou
@@ -846,9 +870,9 @@ export default function PlayerScreen() {
         )}
         <View style={styles.contentCover}>
           {paramPosterUrl ? (
-            <Image source={{ uri: paramPosterUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+            <Image source={{ uri: normalizePosterUrl(paramPosterUrl) }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : (
-            <View style={[StyleSheet.absoluteFillObject, styles.contentCoverFallback]}>
+            <View style={[StyleSheet.absoluteFill, styles.contentCoverFallback]}>
               <Ionicons name="film-outline" size={52} color="#48484d" />
             </View>
           )}

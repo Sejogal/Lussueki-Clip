@@ -3,6 +3,7 @@ import AppBrand from '@/components/AppBrand';
 import { CATEGORIES, CategoryKey } from '@/config';
 import { fetchCategoryContent } from '@/services/api';
 import { PlaylistEntry } from '@/utils/playlist';
+import { normalizePosterUrl } from '@/utils/tmdb';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -44,7 +45,7 @@ const CategoryCard = React.memo(function CategoryCard({ item, categoryKey, width
     >
       <View style={styles.posterWrapper}>
         {item.posterUrl ? (
-          <Image source={{ uri: item.posterUrl }} style={[styles.poster, { width, height }]} resizeMode="cover" />
+          <Image source={{ uri: normalizePosterUrl(item.posterUrl) }} style={[styles.poster, { width, height }]} resizeMode="cover" />
         ) : (
           <View style={[styles.poster, styles.posterFallback, { width, height }]}>
             <Ionicons name="film-outline" size={largeScreen ? 42 : 30} color="#77777d" />

@@ -53,7 +53,6 @@ export default function SettingsScreen() {
           <Ionicons name="arrow-back" size={21} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerText}>
-          <AppBrand />
           <Text style={styles.title}>Definições</Text>
           <Text style={styles.subtitle}>Sobre o aplicativo</Text>
         </View>

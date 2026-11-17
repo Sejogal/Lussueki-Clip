@@ -14,7 +14,6 @@ export default function CategoriesScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <AppBrand />
         <Text style={styles.title}>Categorias</Text>
         <Text style={styles.subtitle}>Encontre filmes, séries, animes e mais.</Text>
       </View>
