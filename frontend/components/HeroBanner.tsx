@@ -1,17 +1,16 @@
 // components/HeroBanner.tsx
 import FavoriteButton from '@/components/FavoriteButton';
-import { CategoryKey } from '@/config/index';
+import { CATEGORIES, CategoryKey } from '@/config/index';
 import { fetchCategoryContent } from '@/services/api';
 import { fetchCloudflareCatalog, fetchCloudflareCategories } from '@/services/cloudflareCatalog';
 import { getCategoryDisplay } from '@/utils/categoryDisplay';
 import { PlaylistEntry } from '@/utils/playlist';
-import { getHiResImage } from '@/utils/tmdb';
+import { getHiResImage, normalizePosterUrl } from '@/utils/tmdb';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    Dimensions,
     FlatList,
     Image,
     StyleSheet,
@@ -19,15 +18,14 @@ import {
     TouchableOpacity,
     View,
     ViewToken,
+    useWindowDimensions,
 } from 'react-native';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const HERO_HEIGHT = Math.round(SCREEN_WIDTH * 1.25);
 const AUTO_ADVANCE_MS = 6000;
 
 // categoryKey é string (não só CategoryKey) pra caber também categorias
 // Cloudflare, que são descobertas em tempo de execução.
-type FeaturedItem = PlaylistEntry & { categoryKey: string; isNew?: boolean };
+type FeaturedItem = PlaylistEntry & { categoryKey: string; isNew?: boolean; fallbackPosterUrl?: string };
 
 // Categorias com maior chance de ter pôster do TMDB (via paste.php), em
 // ordem de preferência — uma vira (no máximo) um slide do carrossel.
@@ -54,15 +52,40 @@ const MAX_CLOUDFLARE_FEATURED = 8;
 // mesmo que só as bolinhas tenham mudado. React.memo evita isso.
 type SlideProps = {
   item: FeaturedItem;
+  width: number;
+  height: number;
   onOpenPreview: (item: FeaturedItem) => void;
   onPlay: (item: FeaturedItem) => void;
 };
 
-const Slide = React.memo(function Slide({ item, onOpenPreview, onPlay }: SlideProps) {
+const Slide = React.memo(function Slide({ item, width, height, onOpenPreview, onPlay }: SlideProps) {
   const categoryDisplay = getCategoryDisplay(item.categoryKey);
+  // Mesmo tratamento comprovado nas fileiras (CategoryRow etc.): um URL
+  // já normalizado para HTTPS, sem reencaminhar para a versão HTTP
+  // original em caso de falha (essa tentativa falhava sempre da mesma
+  // forma no Android, só adiava o resultado final).
+  const normalizedPosterUrl = normalizePosterUrl(item.posterUrl);
+  const normalizedFallbackUrl = normalizePosterUrl(item.fallbackPosterUrl);
+  const preferredPosterUrl = getHiResImage(normalizedPosterUrl, 'w780') ?? normalizedPosterUrl;
+  const [usingFallback, setUsingFallback] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
+  const imageUri = usingFallback ? normalizedFallbackUrl : preferredPosterUrl;
+  const handleImageError = useCallback(() => {
+    if (!usingFallback && normalizedFallbackUrl && normalizedFallbackUrl !== imageUri) {
+      setUsingFallback(true);
+      return;
+    }
+    setImageFailed(true);
+  }, [usingFallback, normalizedFallbackUrl, imageUri]);
   return (
-    <TouchableOpacity activeOpacity={0.94} style={styles.slide} onPress={() => onOpenPreview(item)}>
-      <Image source={{ uri: getHiResImage(item.posterUrl, 'w780') }} style={styles.image} resizeMode="cover" />
+    <TouchableOpacity focusable activeOpacity={0.94} style={[styles.slide, { width, height }]} onPress={() => onOpenPreview(item)}>
+      {imageUri && !imageFailed ? (
+        <Image source={{ uri: imageUri }} style={styles.image} resizeMode="cover" onError={handleImageError} />
+      ) : (
+        <View style={[styles.image, styles.imageFallback]}>
+          <Text style={styles.imageFallbackIcon}>{categoryDisplay.icon}</Text>
+        </View>
+      )}
 
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.4)', '#000']}
@@ -83,7 +106,7 @@ const Slide = React.memo(function Slide({ item, onOpenPreview, onPlay }: SlidePr
           {item.title}
         </Text>
 
-        <TouchableOpacity style={styles.playButton} onPress={() => onPlay(item)}>
+        <TouchableOpacity focusable style={styles.playButton} onPress={(event) => { event.stopPropagation(); onPlay(item); }}>
           <Text style={styles.playButtonText}>▶  Assistir</Text>
         </TouchableOpacity>
       </View>
@@ -101,6 +124,9 @@ const Slide = React.memo(function Slide({ item, onOpenPreview, onPlay }: SlidePr
 
 export default function HeroBanner() {
   const router = useRouter();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const SCREEN_WIDTH = Math.min(windowWidth, 1600);
+  const HERO_HEIGHT = Math.min(windowHeight * 0.72, Math.max(320, SCREEN_WIDTH * (windowWidth > windowHeight ? 0.58 : 1.05)));
   const [items, setItems] = useState<FeaturedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -121,7 +147,7 @@ export default function HeroBanner() {
             const withPoster = entries.filter((entry) => entry.posterUrl);
             if (withPoster.length === 0) return null;
             const pick = withPoster[Math.floor(Math.random() * withPoster.length)];
-            return { ...pick, categoryKey };
+            return { ...pick, categoryKey, fallbackPosterUrl: CATEGORIES[categoryKey]?.capa };
           } catch (err) {
             console.error(`❌ [hero] Erro ao buscar ${categoryKey}:`, err);
             return null;
@@ -204,25 +230,10 @@ export default function HeroBanner() {
       offset: SCREEN_WIDTH * index,
       index,
     }),
-    []
+    [SCREEN_WIDTH]
   );
 
   const keyExtractor = useCallback((item: FeaturedItem) => `${item.categoryKey}-${item.url}`, []);
-
-  const goToPlayer = useCallback(
-    (item: FeaturedItem) => {
-      router.push({
-        pathname: '/player',
-        params: {
-          streamUrl: item.url,
-          title: item.title,
-          posterUrl: item.posterUrl ?? '',
-          categoryKey: item.categoryKey,
-        },
-      });
-    },
-    [router]
-  );
 
   const openPreview = useCallback(
     (item: FeaturedItem) => {
@@ -240,13 +251,13 @@ export default function HeroBanner() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: FeaturedItem }) => <Slide item={item} onOpenPreview={openPreview} onPlay={goToPlayer} />,
-    [openPreview, goToPlayer]
+    ({ item }: { item: FeaturedItem }) => <Slide item={item} width={SCREEN_WIDTH} height={HERO_HEIGHT} onOpenPreview={openPreview} onPlay={openPreview} />,
+    [openPreview, SCREEN_WIDTH, HERO_HEIGHT]
   );
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.loadingContainer]}>
+      <View style={[styles.container, styles.loadingContainer, { width: SCREEN_WIDTH, height: HERO_HEIGHT, alignSelf: 'center' }]}>
         <ActivityIndicator color="#e50914" />
       </View>
     );
@@ -255,11 +266,14 @@ export default function HeroBanner() {
   if (items.length === 0) return null;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { width: SCREEN_WIDTH, height: HERO_HEIGHT, alignSelf: 'center' }]}>
       <FlatList
         ref={flatListRef}
+        style={styles.slideList}
         data={items}
         horizontal
+        nestedScrollEnabled
+        removeClippedSubviews={false}
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         keyExtractor={keyExtractor}
@@ -284,24 +298,30 @@ export default function HeroBanner() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    width: SCREEN_WIDTH,
-    height: HERO_HEIGHT,
+  slide: {
+    position: 'relative',
+    overflow: 'hidden',
     backgroundColor: '#0a0a0a',
   },
+  container: {
+    backgroundColor: '#0a0a0a',
+  },
+  slideList: { flex: 1 },
   loadingContainer: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-  slide: {
-    width: SCREEN_WIDTH,
-    height: HERO_HEIGHT,
-  },
   image: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
+  imageFallback: {
+    backgroundColor: '#171719',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageFallbackIcon: { color: '#5b5b60', fontSize: 54, fontWeight: '800' },
   gradient: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   content: {
     position: 'absolute',
@@ -330,7 +350,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#fff',
-    fontSize: 30,
+    fontSize: 24,
     fontWeight: '800',
     marginBottom: 18,
     textShadowColor: 'rgba(0,0,0,0.7)',

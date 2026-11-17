@@ -14,6 +14,7 @@
 
 import { PlaylistEntry, stripHtml } from '@/utils/playlist';
 import { filterFailedContent, readDeviceCache, writeDeviceCache } from '@/services/deviceCache';
+import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 
 const ADVANCED_SEARCH_URL = 'https://archive.org/advancedsearch.php';
 const METADATA_URL = 'https://archive.org/metadata';
@@ -101,7 +102,7 @@ export async function searchArchiveOrg(query: string, rows = 24): Promise<Playli
     `&rows=${rows}&page=1&output=json`;
 
   try {
-    const response = await fetch(url);
+    const response = await fetchWithTimeout(url);
     if (!response.ok) throw new Error(`HTTP ${response.status} ao buscar no archive.org`);
 
     const data = await response.json();
@@ -145,7 +146,7 @@ type ArchiveMetadataResponse = {
 export async function getArchiveOrgPlayableUrl(
   identifier: string
 ): Promise<{ url: string; title?: string } | null> {
-  const response = await fetch(`${METADATA_URL}/${identifier}`);
+  const response = await fetchWithTimeout(`${METADATA_URL}/${identifier}`);
   if (!response.ok) {
     throw new Error(`HTTP ${response.status} ao buscar metadados de ${identifier}`);
   }

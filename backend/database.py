@@ -107,6 +107,7 @@ def init_db() -> None:
                 title TEXT NOT NULL,
                 category TEXT,
                 source_url TEXT NOT NULL,
+                poster_url TEXT,
                 position_seconds INTEGER NOT NULL DEFAULT 0,
                 duration_seconds INTEGER,
                 view_count INTEGER NOT NULL DEFAULT 1,
@@ -143,5 +144,7 @@ def init_db() -> None:
                 ADD COLUMN IF NOT EXISTS position_seconds INTEGER NOT NULL DEFAULT 0;
             ALTER TABLE watch_history
                 ADD COLUMN IF NOT EXISTS duration_seconds INTEGER;
+            ALTER TABLE watch_history
+                ADD COLUMN IF NOT EXISTS poster_url TEXT;
             """
         )

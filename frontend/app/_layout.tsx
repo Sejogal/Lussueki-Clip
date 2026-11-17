@@ -7,6 +7,8 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <FavoritesProvider>
+        {/* O ecrã /player decide a própria orientação (ver app/player.tsx):
+            retrato enquanto escolhe episódio, paisagem só a reproduzir. */}
         <Stack screenOptions={{ headerShown: false }} />
       </FavoritesProvider>
     </AuthProvider>

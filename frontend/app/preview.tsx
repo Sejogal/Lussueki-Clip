@@ -22,7 +22,7 @@ import FavoriteButton from '@/components/FavoriteButton';
 import { ARCHIVE_ITEM_PREFIX, getArchiveOrgPlayableUrl } from '@/services/archiveOrg';
 import { getCategoryDisplay } from '@/utils/categoryDisplay';
 import { fetchPlaylistEntries, isDirectMediaUrl, PlaylistEntry } from '@/utils/playlist';
-import { getHiResImage } from '@/utils/tmdb';
+import { getHiResImage, normalizePosterUrl } from '@/utils/tmdb';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -56,9 +56,9 @@ const EpisodeItem = React.memo(function EpisodeItem({
   onPress: (item: PlaylistEntry) => void;
 }) {
   return (
-    <TouchableOpacity style={styles.episodeItem} onPress={() => onPress(item)}>
+    <TouchableOpacity focusable style={styles.episodeItem} onPress={() => onPress(item)}>
       {item.posterUrl ? (
-        <Image source={{ uri: item.posterUrl }} style={styles.episodeThumb} />
+        <Image source={{ uri: normalizePosterUrl(item.posterUrl) }} style={styles.episodeThumb} />
       ) : (
         <View style={styles.episodeIndexBadge}>
           <Text style={styles.episodeIndexText}>{index + 1}</Text>
@@ -84,7 +84,7 @@ export default function PreviewScreen() {
   const synopsis = paramToString(params.synopsis) || undefined;
 
   const categoryDisplay = useMemo(() => getCategoryDisplay(categoryKey || undefined), [categoryKey]);
-  const backdropUrl = useMemo(() => getHiResImage(posterUrl, 'w780'), [posterUrl]);
+  const backdropUrl = useMemo(() => getHiResImage(normalizePosterUrl(posterUrl), 'w780'), [posterUrl]);
 
   // ── Resolução recursiva (mesma ideia do player.tsx) ──────────────────
   const [coverResolving, setCoverResolving] = useState(true);
@@ -102,10 +102,16 @@ export default function PreviewScreen() {
   const resolveTokenRef = useRef(0);
 
   const goToPlayer = useCallback(
-    (entryTitle: string, entryUrl: string) => {
+    (entryTitle: string, entryUrl: string, episodeQueue?: PlaylistEntry[]) => {
       router.push({
         pathname: '/player',
-        params: { streamUrl: entryUrl, title: entryTitle, posterUrl: posterUrl ?? '', categoryKey },
+        params: {
+          streamUrl: entryUrl,
+          title: entryTitle,
+          posterUrl: posterUrl ?? '',
+          categoryKey,
+          ...(episodeQueue && episodeQueue.length > 1 ? { episodeQueue: JSON.stringify(episodeQueue) } : {}),
+        },
       });
     },
     [router, posterUrl, categoryKey]
@@ -134,7 +140,10 @@ export default function PreviewScreen() {
             setResolvedLeaf({ title: label, url });
             setCoverResolving(false);
           } else {
-            goToPlayer(label, url);
+            const entries = currentListRef.current?.entries ?? [];
+            const selectedIndex = entries.findIndex((entry) => entry.url === url || entry.title === label);
+            const episodeQueue = selectedIndex >= 0 ? entries.slice(selectedIndex) : undefined;
+            goToPlayer(label, url, episodeQueue);
           }
           return;
         }
@@ -241,9 +250,11 @@ export default function PreviewScreen() {
                 </Text>
               </View>
             ) : null}
-            <Text style={styles.title} numberOfLines={3}>
-              {title}
-            </Text>
+            <View style={styles.titlePanel}>
+              <Text style={styles.title} numberOfLines={3}>
+                {title}
+              </Text>
+            </View>
             <TouchableOpacity
               accessibilityRole="button"
               style={[styles.playButton, assistirDisabled && styles.playButtonDisabled]}
@@ -261,9 +272,11 @@ export default function PreviewScreen() {
             <Text style={styles.compactEyebrow} numberOfLines={1}>
               {listStack.length > 0 ? `EPISÓDIOS · ${currentList!.title}` : 'ESCOLHA UMA TEMPORADA'}
             </Text>
-            <Text style={styles.compactTitle} numberOfLines={2}>
-              {title}
-            </Text>
+            <View style={styles.compactTitlePanel}>
+              <Text style={styles.compactTitle} numberOfLines={2}>
+                {title}
+              </Text>
+            </View>
           </View>
         )}
       </View>
@@ -275,7 +288,7 @@ export default function PreviewScreen() {
       )}
 
       <View style={styles.topRow}>
-        <TouchableOpacity accessibilityLabel="Voltar" style={styles.roundButton} onPress={handleBack}>
+        <TouchableOpacity focusable accessibilityLabel="Voltar" style={styles.roundButton} onPress={handleBack}>
           <Ionicons name="arrow-back" size={21} color="#fff" />
         </TouchableOpacity>
         <FavoriteButton item={{ title, url: streamUrl, posterUrl, categoryKey }} variant="floating" size={20} />
@@ -358,12 +371,23 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+  titlePanel: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    backgroundColor: 'rgba(0,0,0,0.82)',
+    borderLeftWidth: 4,
+    borderLeftColor: '#e50914',
+    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    marginBottom: 10,
+  },
   title: {
     color: '#fff',
-    fontSize: 28,
-    fontWeight: '800',
-    marginBottom: 22,
-    textShadowColor: 'rgba(0,0,0,0.7)',
+    fontSize: 21,
+    lineHeight: 26,
+    fontWeight: '900',
+    textShadowColor: 'rgba(0,0,0,0.9)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
   },
@@ -388,11 +412,22 @@ const styles = StyleSheet.create({
     bottom: 16,
   },
   compactEyebrow: { color: '#ff777d', fontSize: 11, fontWeight: '800', letterSpacing: 0.5, marginBottom: 6 },
+  compactTitlePanel: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    backgroundColor: 'rgba(0,0,0,0.82)',
+    borderLeftWidth: 4,
+    borderLeftColor: '#e50914',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
   compactTitle: {
     color: '#fff',
-    fontSize: 21,
-    fontWeight: '800',
-    textShadowColor: 'rgba(0,0,0,0.7)',
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: '900',
+    textShadowColor: 'rgba(0,0,0,0.9)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
   },

@@ -6,15 +6,16 @@ import { markContentAsFailed } from '@/services/deviceCache';
 import { downloadMedia, getDownloadedMedia } from '@/services/downloads';
 import type { DownloadProgress } from '@/services/downloads';
 import { fetchPlaylistEntries, isDirectMediaUrl, PlaylistEntry } from '@/utils/playlist';
+import { normalizePosterUrl } from '@/utils/tmdb';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { useVideoPlayer, VideoPlayer, VideoView } from 'expo-video';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Animated,
-    Dimensions,
     FlatList,
     Image,
     StyleSheet,
@@ -24,7 +25,6 @@ import {
 } from 'react-native';
 import styles from '../assets/styles/player';
 
-const { width, height } = Dimensions.get('window');
 
 const USER_AGENT = 'VLC/3.0.18 LibVLC/3.0.18';
 
@@ -48,9 +48,9 @@ type EpisodeItemProps = {
 
 const EpisodeItem = React.memo(function EpisodeItem({ item, index, onPress }: EpisodeItemProps) {
   return (
-    <TouchableOpacity style={styles.episodeItem} onPress={() => onPress(item)}>
+    <TouchableOpacity focusable style={styles.episodeItem} onPress={() => onPress(item)}>
       {item.posterUrl ? (
-        <Image source={{ uri: item.posterUrl }} style={styles.episodeThumb} />
+        <Image source={{ uri: normalizePosterUrl(item.posterUrl) }} style={styles.episodeThumb} />
       ) : (
         <View style={styles.episodeIndexBadge}>
           <Text style={styles.episodeIndexText}>{index + 1}</Text>
@@ -172,6 +172,19 @@ export default function PlayerScreen() {
     return value ? String(value) : undefined;
   }, [params.categoryKey]);
 
+  const episodeQueue = useMemo((): Episode[] => {
+    const value = Array.isArray(params.episodeQueue) ? params.episodeQueue[0] : params.episodeQueue;
+    if (!value || typeof value !== 'string') return [];
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return Array.isArray(parsed)
+        ? parsed.filter((entry): entry is Episode => Boolean(entry && typeof entry.title === 'string' && typeof entry.url === 'string'))
+        : [];
+    } catch {
+      return [];
+    }
+  }, [params.episodeQueue]);
+
   const resumePosition = useMemo(() => {
     if (!params.positionSeconds) return 0;
     const value = Array.isArray(params.positionSeconds) ? params.positionSeconds[0] : params.positionSeconds;
@@ -201,11 +214,33 @@ export default function PlayerScreen() {
   // teríamos uma "mídia final", checamos se ela não é, na verdade, mais
   // uma playlist — e se for, resolvemos de novo, até achar vídeo de
   // verdade ou uma lista com mais de um item (aí mostramos o seletor).
-  const [currentList, setCurrentList] = useState<ListLevel | null>(null);
+  const [currentList, setCurrentList] = useState<ListLevel | null>(() =>
+    episodeQueue.length > 1 ? { title: paramTitle || 'Episódios', entries: episodeQueue } : null
+  );
   const [listStack, setListStack] = useState<ListLevel[]>([]);
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [downloadState, setDownloadState] = useState<'idle' | 'downloading' | 'downloaded' | 'error'>('idle');
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
+
+  // O ecrã do player serve dois estados bem diferentes: escolher
+  // temporada/episódio (lista vertical, pensada para retrato) e ver o
+  // vídeo (melhor em paisagem). Bloquear a rota inteira a 'landscape'
+  // (como estava em app/_layout.tsx) forçava a lista de episódios a abrir
+  // já rodada, onde a FlatList vertical não tinha como funcionar direito.
+  // Por isso o bloqueio agora segue o estado real: retrato para escolher,
+  // paisagem só depois de um episódio ser mesmo selecionado para tocar.
+  useEffect(() => {
+    const lock = selectedEpisode
+      ? ScreenOrientation.OrientationLock.LANDSCAPE
+      : ScreenOrientation.OrientationLock.PORTRAIT_UP;
+    void ScreenOrientation.lockAsync(lock);
+  }, [selectedEpisode]);
+
+  useEffect(() => {
+    return () => {
+      void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    };
+  }, []);
 
   // TV ao vivo (canais IPTV) ou qualquer stream .m3u8 — sem duração real,
   // então a barra de progresso do player nativo não faz sentido pra esse
@@ -454,6 +489,7 @@ export default function PlayerScreen() {
         title: selectedEpisode.title || paramTitle || 'Reproduzindo...',
         category: paramCategoryKey,
         source_url: streamUrl,
+        poster_url: normalizePosterUrl(selectedEpisode.posterUrl) ?? normalizePosterUrl(paramPosterUrl) ?? null,
         content_key: getContentKey(streamUrl, selectedEpisode.title),
         position_seconds: progress.position,
         duration_seconds: progress.duration,
@@ -466,7 +502,7 @@ export default function PlayerScreen() {
       clearInterval(interval);
       saveProgress();
     };
-  }, [paramCategoryKey, paramTitle, player, selectedEpisode, streamUrl]);
+  }, [paramCategoryKey, paramPosterUrl, paramTitle, player, selectedEpisode, streamUrl]);
 
   // Ref para a função de retry poder ser chamada de dentro do listener de
   // status (definido antes de attemptPlayback existir) sem closures obsoletas.
@@ -507,6 +543,7 @@ export default function PlayerScreen() {
               title: episode.title || paramTitle || 'Reproduzindo...',
               category: paramCategoryKey,
               source_url: streamUrl,
+              poster_url: normalizePosterUrl(episode.posterUrl) ?? normalizePosterUrl(paramPosterUrl) ?? null,
               content_key: contentKey,
               position_seconds: 0,
               duration_seconds: undefined,
@@ -538,7 +575,7 @@ export default function PlayerScreen() {
     return () => {
       subscription.remove();
     };
-  }, [paramCategoryKey, paramTitle, player, streamUrl]);
+  }, [paramCategoryKey, paramPosterUrl, paramTitle, player, streamUrl]);
 
   // Contador de tentativas automáticas (qualquer tipo de erro de
   // reprodução) — reseta toda vez que um episódio novo é selecionado ou
@@ -746,6 +783,9 @@ export default function PlayerScreen() {
 
   const episodeKeyExtractor = useCallback((item: Episode, index: number) => `${index}-${item.url}`, []);
 
+  const selectedEpisodeIndex = currentList?.entries.findIndex((episode) => episode.url === selectedEpisode?.url) ?? -1;
+  const nextEpisode = selectedEpisodeIndex >= 0 ? currentList?.entries[selectedEpisodeIndex + 1] : undefined;
+
   const handleBack = () => {
     if (listStack.length > 0) {
       // Sobe um nível na hierarquia em vez de sair do player.
@@ -766,7 +806,7 @@ export default function PlayerScreen() {
       <View style={styles.container}>
         <View style={styles.centerContent}>
           <Text style={styles.errorText}>⚠️ URL do stream não encontrada</Text>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity focusable style={styles.backButton} onPress={() => router.back()}>
             <Text style={styles.backText}>← Voltar</Text>
           </TouchableOpacity>
         </View>
@@ -788,7 +828,7 @@ export default function PlayerScreen() {
                 <Text style={styles.backText}>↻ Tentar novamente</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.backButtonInline} onPress={() => router.back()}>
+            <TouchableOpacity focusable style={styles.backButtonInline} onPress={() => router.back()}>
               <Text style={styles.backText}>← Voltar</Text>
             </TouchableOpacity>
           </View>
@@ -804,7 +844,7 @@ export default function PlayerScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.episodeHeader}>
-          <TouchableOpacity style={styles.backButtonInline} onPress={handleBack}>
+          <TouchableOpacity focusable style={styles.backButtonInline} onPress={handleBack}>
             <Text style={styles.backText}>← Voltar</Text>
           </TouchableOpacity>
           <Text style={styles.episodeHeaderTitle} numberOfLines={1}>
@@ -830,9 +870,9 @@ export default function PlayerScreen() {
         )}
         <View style={styles.contentCover}>
           {paramPosterUrl ? (
-            <Image source={{ uri: paramPosterUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+            <Image source={{ uri: normalizePosterUrl(paramPosterUrl) }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : (
-            <View style={[StyleSheet.absoluteFillObject, styles.contentCoverFallback]}>
+            <View style={[StyleSheet.absoluteFill, styles.contentCoverFallback]}>
               <Ionicons name="film-outline" size={52} color="#48484d" />
             </View>
           )}
@@ -893,7 +933,7 @@ export default function PlayerScreen() {
           // Android some a barra inferior inteira, que é onde o tempo e a
           // barra de progresso ficam).
           showsTimecodes={!isLive}
-          buttonOptions={isLive ? { showBottomBar: false } : undefined}
+          buttonOptions={isLive ? { showBottomBar: false } : { showNext: Boolean(nextEpisode) }}
         />
       )}
       {isLive && selectedEpisode && (
@@ -902,7 +942,7 @@ export default function PlayerScreen() {
           <Text style={styles.liveBadgeText}>AO VIVO</Text>
         </View>
       )}
-      <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+      <TouchableOpacity focusable style={styles.backButton} onPress={handleBack}>
         <Text style={styles.backText}>← Voltar</Text>
       </TouchableOpacity>
       <View style={styles.topRightStack}>

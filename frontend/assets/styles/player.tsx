@@ -1,6 +1,4 @@
-import { StyleSheet, Dimensions } from "react-native";
-
-const { width, height } = Dimensions.get('window');
+import { StyleSheet } from "react-native";
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
@@ -9,7 +7,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  video: { width, height: height * 0.85, alignSelf: 'center' },
+  video: { width: '100%', height: '100%', alignSelf: 'center' },
   backButton: {
     position: 'absolute',
     top: 50,
@@ -88,15 +86,19 @@ const styles = StyleSheet.create({
   },
   loadingText: { color: '#fff', marginTop: 10, fontSize: 14 },
   errorText: { color: '#ff6b6b', fontSize: 16, textAlign: 'center', marginBottom: 20 },
+  // Antes ficava a `bottom: 0` com fundo quase opaco — exatamente onde o
+  // player nativo (`nativeControls`) desenha a barra de progresso e o
+  // tempo, tapando-os por completo. Movido para debaixo do botão
+  // "Voltar"/topo (que ocupam até ~top:90), sem fundo sólido, só com
+  // sombra no texto — não interfere com os controlos nativos em lado
+  // nenhum do ecrã.
   titleContainer: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 10,
+    top: 92,
+    left: 20,
+    right: 20,
   },
-  titleText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  titleText: { color: '#fff', fontSize: 17, lineHeight: 22, fontWeight: '800', textShadowColor: '#000', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   episodeHeader: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -5,6 +5,7 @@ import ContinueWatchingRow from '@/components/ContinueWatchingRow';
 import FavoriteButton from '@/components/FavoriteButton';
 import FavoritesRow from '@/components/FavoritesRow';
 import HeroBanner from '@/components/HeroBanner';
+import AppBrand from '@/components/AppBrand';
 import MainBottomNav from '@/components/MainBottomNav';
 import PublicDomainRow from '@/components/PublicDomainRow';
 import { CLOUDFLARE_CATEGORIES } from '@/config/cloudflare';
@@ -14,6 +15,7 @@ import { PUBLIC_DOMAIN_CATEGORIES } from '@/services/archiveOrg';
 import { CloudflareCategory, fetchCloudflareCategories } from '@/services/cloudflareCatalog';
 import { getCategoryDisplay } from '@/utils/categoryDisplay';
 import { PlaylistEntry } from '@/utils/playlist';
+import { normalizePosterUrl } from '@/utils/tmdb';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -27,12 +29,15 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
 type SearchResult = PlaylistEntry & { categoryKey: CategoryKey };
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const largeScreen = width >= 900;
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
@@ -124,19 +129,20 @@ export default function HomeScreen() {
       const categoryDisplay = getCategoryDisplay(item.categoryKey);
       return (
         <TouchableOpacity
+          focusable
           activeOpacity={0.7}
-          style={styles.searchResultCard}
+          style={[styles.searchResultCard, largeScreen && styles.searchResultCardLarge]}
           onPress={() => handleItemPress(item)}
         >
           {item.posterUrl ? (
-            <Image source={{ uri: item.posterUrl }} style={styles.searchResultPoster} />
+            <Image source={{ uri: normalizePosterUrl(item.posterUrl) }} style={[styles.searchResultPoster, largeScreen && styles.searchResultPosterLarge]} />
           ) : (
-            <View style={[styles.searchResultPoster, styles.searchResultPosterFallback]}>
+            <View style={[styles.searchResultPoster, largeScreen && styles.searchResultPosterLarge, styles.searchResultPosterFallback]}>
               <Text style={{ fontSize: 20 }}>{categoryDisplay.icon}</Text>
             </View>
           )}
           <View style={styles.searchResultText}>
-            <Text style={styles.searchResultTitle} numberOfLines={2}>
+            <Text style={[styles.searchResultTitle, largeScreen && styles.searchResultTitleLarge]} numberOfLines={2}>
               {item.title}
             </Text>
             <Text style={styles.searchResultCategory}>{categoryDisplay.label}</Text>
@@ -150,7 +156,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
       );
     },
-    [handleItemPress]
+    [handleItemPress, largeScreen]
   );
 
   type HomeListItem =
@@ -222,9 +228,10 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Lussueki <Text style={{color:'red'}} >Clip</Text></Text>
+      <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 54 : largeScreen ? 20 : 44 }]}>
+        <AppBrand />
         <TouchableOpacity
+          focusable
           accessibilityRole="button"
           accessibilityLabel="Abrir definições"
           style={styles.settingsButton}
@@ -235,10 +242,10 @@ export default function HomeScreen() {
       </View>
 
       {/* Barra de pesquisa */}
-      <View style={styles.searchContainer}>
+      <View style={[styles.searchContainer, largeScreen && styles.searchContainerLarge]}>
         <Ionicons name="search" size={20} color="#8e8e93" style={styles.searchIcon} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, largeScreen && styles.searchInputLarge]}
           placeholder="Buscar filmes, séries, animes..."
           placeholderTextColor="#8e8e93"
           value={searchQuery}
@@ -247,7 +254,7 @@ export default function HomeScreen() {
           returnKeyType="search"
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
+          <TouchableOpacity focusable onPress={() => setSearchQuery('')}>
             <Ionicons name="close-circle" size={20} color="#8e8e93" />
           </TouchableOpacity>
         )}
@@ -287,6 +294,7 @@ export default function HomeScreen() {
           }
           contentContainerStyle={styles.categoriesList}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews={false}
         />
       )}
       <MainBottomNav active="home" />
@@ -297,6 +305,9 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
+    maxWidth: 1600,
+    alignSelf: 'center',
     backgroundColor: '#000',
   },
   centerContent: {
@@ -312,11 +323,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'ios' ? 54 : 44,
     paddingBottom: 10,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#fff',
   },
   settingsButton: {
     width: 40,
@@ -337,6 +343,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 10,
   },
+  searchContainerLarge: { minHeight: 54, borderRadius: 12, marginHorizontal: 28 },
+  searchInputLarge: { height: 52, fontSize: 18 },
   searchIcon: {
     marginRight: 8,
   },
@@ -396,6 +404,8 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#2c2c2e',
   },
+  searchResultCardLarge: { minHeight: 88, padding: 12, borderRadius: 12 },
+  searchResultPosterLarge: { width: 62, height: 88 },
   searchResultPosterFallback: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -404,6 +414,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
   },
+  searchResultTitleLarge: { fontSize: 17 },
   searchResultTitle: {
     color: '#fff',
     fontSize: 14,

@@ -31,6 +31,7 @@
 //   destaque, só na fileira normal da categoria.
 import { getApiUrl } from '@/config/api';
 import { filterFailedContent, readDeviceCache, writeDeviceCache } from '@/services/deviceCache';
+import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 import { parsePlaylistResponse, PlaylistEntry } from '@/utils/playlist';
 
 export type CloudflareCategory = {
@@ -80,7 +81,7 @@ export async function fetchCloudflareCategories(): Promise<CloudflareCategory[]>
 
   const url = `${getApiUrl()}/catalog`;
   try {
-    const response = await fetch(url);
+    const response = await fetchWithTimeout(url);
     if (!response.ok) throw new Error(`HTTP ${response.status} ao buscar categorias Cloudflare`);
     const categories = normalizeCategories(await response.json());
     await writeDeviceCache(cacheKey, categories);
@@ -105,7 +106,7 @@ export async function fetchCloudflareCatalog(category: string): Promise<Playlist
 
   const url = `${getApiUrl()}/catalog/${encodeURIComponent(category)}`;
   try {
-    const response = await fetch(url);
+    const response = await fetchWithTimeout(url);
     if (!response.ok) throw new Error(`HTTP ${response.status} ao buscar o catálogo Cloudflare (${category})`);
 
     const text = await response.text();

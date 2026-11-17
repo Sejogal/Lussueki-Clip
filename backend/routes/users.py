@@ -50,7 +50,7 @@ def get_profile(user_id: int = Depends(current_user_id)) -> UserResponse:
 def get_history(user_id: int = Depends(current_user_id)) -> list[HistoryResponse]:
     with get_connection() as connection:
         rows = connection.execute(
-            "SELECT id, content_key, title, category, source_url, position_seconds, "
+            "SELECT id, content_key, title, category, source_url, poster_url, position_seconds, "
             "duration_seconds, view_count, last_watched_at "
             "FROM watch_history WHERE user_id = %s ORDER BY last_watched_at DESC",
             (user_id,),
@@ -66,7 +66,7 @@ def get_continue_watching(user_id: int = Depends(current_user_id)) -> list[Histo
     with get_connection() as connection:
         rows = connection.execute(
             """
-            SELECT id, content_key, title, category, source_url, position_seconds,
+            SELECT id, content_key, title, category, source_url, poster_url, position_seconds,
                    duration_seconds, view_count, last_watched_at
             FROM watch_history
             WHERE user_id = %s
@@ -87,13 +87,14 @@ def register_watch(payload: WatchRequest, user_id: int = Depends(current_user_id
         connection.execute(
             """
             INSERT INTO watch_history
-                (user_id, content_key, title, category, source_url,
+                (user_id, content_key, title, category, source_url, poster_url,
                  position_seconds, duration_seconds, view_count, last_watched_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 1, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1, %s)
             ON CONFLICT(user_id, content_key) DO UPDATE SET
                 title = excluded.title,
                 category = excluded.category,
                 source_url = excluded.source_url,
+                poster_url = COALESCE(excluded.poster_url, watch_history.poster_url),
                 position_seconds = excluded.position_seconds,
                 duration_seconds = COALESCE(excluded.duration_seconds, watch_history.duration_seconds),
                 view_count = watch_history.view_count + CASE WHEN %s THEN 1 ELSE 0 END,
@@ -105,6 +106,7 @@ def register_watch(payload: WatchRequest, user_id: int = Depends(current_user_id
                 payload.title,
                 payload.category,
                 payload.source_url,
+                payload.poster_url,
                 payload.position_seconds,
                 payload.duration_seconds,
                 now,
@@ -112,7 +114,7 @@ def register_watch(payload: WatchRequest, user_id: int = Depends(current_user_id
             ),
         )
         row = connection.execute(
-            "SELECT content_key, title, category, source_url, position_seconds, "
+            "SELECT content_key, title, category, source_url, poster_url, position_seconds, "
             "duration_seconds, view_count, last_watched_at "
             "FROM watch_history WHERE user_id = %s AND content_key = %s",
             (user_id, content_key),

@@ -1,3 +1,4 @@
+import AppBrand from '@/components/AppBrand';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
@@ -116,12 +117,12 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#09090b' },
+  container: { flex: 1, width: '100%', maxWidth: 1600, alignSelf: 'center', backgroundColor: '#09090b' },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#2a2a2e' },
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: '#19191c' },
   headerText: { marginLeft: 13 },
-  title: { color: '#fff', fontSize: 20, fontWeight: '800' },
-  subtitle: { color: '#96969d', fontSize: 12, marginTop: 2 },
+  title: { color: '#fff', fontSize: 19, lineHeight: 25, fontWeight: '800', marginTop: 3 },
+  subtitle: { color: '#a1a1a8', fontSize: 13, lineHeight: 18, marginTop: 3 },
   content: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 36 },
   sectionEyebrow: { color: '#ff777d', fontSize: 11, fontWeight: '800', marginBottom: 9 },
   introTitle: { color: '#fff', fontSize: 25, lineHeight: 31, fontWeight: '800', maxWidth: 320 },
