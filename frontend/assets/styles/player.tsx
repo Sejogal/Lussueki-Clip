@@ -41,11 +41,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   liveBadge: {
-    // Fica por baixo do botão "Voltar" (mesmo left), em vez de ao lado —
-    // colocar ao lado exigia adivinhar a largura do texto do botão, que
-    // varia (fonte, idioma), e acabava sobrepondo.
+    // Sem botão "Voltar" nesta tela (navegação pelo gesto/botão normal do
+    // aparelho) — fica à mesma altura do grupo de ícones do lado direito.
     position: 'absolute',
-    top: 98,
+    top: 50,
     left: 20,
     flexDirection: 'row',
     alignItems: 'center',

@@ -49,21 +49,32 @@ function friendlyResolveError(err: unknown): string {
 const EpisodeItem = React.memo(function EpisodeItem({
   item,
   index,
+  fallbackPosterUrl,
   onPress,
 }: {
   item: PlaylistEntry;
   index: number;
+  // A maioria das fontes só tem UM pôster (o da série/temporada), nunca
+  // um por episódio — sem isto, quase todos os episódios ficavam só com
+  // o número, sem nenhuma imagem.
+  fallbackPosterUrl?: string;
   onPress: (item: PlaylistEntry) => void;
 }) {
+  const posterUrl = normalizePosterUrl(item.posterUrl) ?? fallbackPosterUrl;
   return (
     <TouchableOpacity focusable style={styles.episodeItem} onPress={() => onPress(item)}>
-      {item.posterUrl ? (
-        <Image source={{ uri: normalizePosterUrl(item.posterUrl) }} style={styles.episodeThumb} />
-      ) : (
-        <View style={styles.episodeIndexBadge}>
+      <View style={styles.episodeThumbWrap}>
+        {posterUrl ? (
+          <>
+            <Image source={{ uri: posterUrl }} style={styles.episodeThumbImage} resizeMode="cover" />
+            <View style={styles.episodeIndexBadge}>
+              <Text style={styles.episodeIndexBadgeText}>{index + 1}</Text>
+            </View>
+          </>
+        ) : (
           <Text style={styles.episodeIndexText}>{index + 1}</Text>
-        </View>
-      )}
+        )}
+      </View>
       <Text style={styles.episodeItemText} numberOfLines={2}>
         {item.title}
       </Text>
@@ -209,11 +220,12 @@ export default function PreviewScreen() {
     router.back();
   };
 
+  const normalizedSeriesPoster = normalizePosterUrl(posterUrl);
   const renderEpisodeItem = useCallback(
     ({ item, index }: { item: PlaylistEntry; index: number }) => (
-      <EpisodeItem item={item} index={index} onPress={handleEntryPress} />
+      <EpisodeItem item={item} index={index} fallbackPosterUrl={normalizedSeriesPoster} onPress={handleEntryPress} />
     ),
-    [handleEntryPress]
+    [handleEntryPress, normalizedSeriesPoster]
   );
   const episodeKeyExtractor = useCallback((item: PlaylistEntry, index: number) => `${index}-${item.url}`, []);
 
@@ -324,6 +336,7 @@ export default function PreviewScreen() {
             maxToRenderPerBatch={10}
             windowSize={7}
             removeClippedSubviews
+            ListFooterComponent={<Text style={styles.appWatermark}>Lussueki Clip</Text>}
           />
         </>
       )}
@@ -435,17 +448,32 @@ const styles = StyleSheet.create({
   inlineResolvingText: { color: '#8e8e93', fontSize: 12 },
   episodeList: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 30 },
   episodeItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9 },
-  episodeThumb: { width: 56, height: 56, borderRadius: 6, backgroundColor: '#1c1c1e' },
-  episodeIndexBadge: {
+  episodeThumbWrap: {
     width: 56,
     height: 56,
     borderRadius: 6,
     backgroundColor: '#1c1c1e',
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  episodeThumbImage: { width: '100%', height: '100%' },
+  episodeIndexBadge: {
+    position: 'absolute',
+    right: 2,
+    bottom: 2,
+    minWidth: 17,
+    height: 17,
+    paddingHorizontal: 3,
+    borderRadius: 8.5,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  episodeIndexBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   episodeIndexText: { color: '#8e8e93', fontSize: 16, fontWeight: '700' },
   episodeItemText: { flex: 1, color: '#e5e5e7', fontSize: 14, fontWeight: '600' },
+  appWatermark: { color: '#3a3a3d', fontSize: 11, fontWeight: '600', textAlign: 'center', marginTop: 18, marginBottom: 6, letterSpacing: 0.4 },
   errorBox: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   errorText: { color: '#e5e5e7', fontSize: 14, textAlign: 'center', lineHeight: 20 },
   errorButtonRow: { marginTop: 16 },
