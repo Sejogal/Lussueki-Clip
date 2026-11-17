@@ -230,15 +230,26 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 54 : largeScreen ? 20 : 44 }]}>
         <AppBrand />
-        <TouchableOpacity
-          focusable
-          accessibilityRole="button"
-          accessibilityLabel="Abrir definições"
-          style={styles.settingsButton}
-          onPress={() => router.push('/settings')}
-        >
-          <Ionicons name="settings-outline" size={21} color="#f2f2f4" />
-        </TouchableOpacity>
+        <View style={styles.headerIcons}>
+          <TouchableOpacity
+            focusable
+            accessibilityRole="button"
+            accessibilityLabel="Ver recentes"
+            style={styles.settingsButton}
+            onPress={() => router.push('/recentes')}
+          >
+            <Ionicons name="time-outline" size={21} color="#f2f2f4" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            focusable
+            accessibilityRole="button"
+            accessibilityLabel="Abrir definições"
+            style={styles.settingsButton}
+            onPress={() => router.push('/settings')}
+          >
+            <Ionicons name="settings-outline" size={21} color="#f2f2f4" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Barra de pesquisa */}
@@ -323,6 +334,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'ios' ? 54 : 44,
     paddingBottom: 10,
+  },
+  headerIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   settingsButton: {
     width: 40,

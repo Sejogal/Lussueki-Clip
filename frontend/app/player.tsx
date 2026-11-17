@@ -577,6 +577,43 @@ export default function PlayerScreen() {
     };
   }, [paramCategoryKey, paramPosterUrl, paramTitle, player, streamUrl]);
 
+  // O expo-video não expõe nenhum evento de "os controlos nativos
+  // ficaram visíveis/escondidos" (confirmado no tipo `VideoViewProps` —
+  // só existe o booleano `nativeControls`, nada para saber quando o
+  // utilizador tocou no ecrã) — não há forma de sincronizar exatamente
+  // com esse toque. Em vez disso, o título segue o mesmo ritmo que os
+  // controlos nativos costumam ter por omissão (`controllerAutoShow`):
+  // aparece quando o vídeo está em pausa/a carregar e esconde-se sozinho
+  // pouco depois de começar/retomar a reprodução.
+  const [titleVisible, setTitleVisible] = useState(true);
+  const titleHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!player || !selectedEpisode) return;
+    // Começa visível em cada episódio novo (reage à troca de episódio,
+    // não a um valor derivável do render).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTitleVisible(true);
+    const clearHideTimer = () => {
+      if (titleHideTimerRef.current) {
+        clearTimeout(titleHideTimerRef.current);
+        titleHideTimerRef.current = null;
+      }
+    };
+    const subscription = player.addListener('playingChange', ({ isPlaying }) => {
+      if (!isMountedRef.current) return;
+      clearHideTimer();
+      if (isPlaying) {
+        titleHideTimerRef.current = setTimeout(() => setTitleVisible(false), 3000);
+      } else {
+        setTitleVisible(true);
+      }
+    });
+    return () => {
+      clearHideTimer();
+      subscription.remove();
+    };
+  }, [player, selectedEpisode]);
+
   // Contador de tentativas automáticas (qualquer tipo de erro de
   // reprodução) — reseta toda vez que um episódio novo é selecionado ou
   // um retry manual é feito. Vai de 0 até RETRY_DELAYS_MS.length.
@@ -942,9 +979,6 @@ export default function PlayerScreen() {
           <Text style={styles.liveBadgeText}>AO VIVO</Text>
         </View>
       )}
-      <TouchableOpacity focusable style={styles.backButton} onPress={handleBack}>
-        <Text style={styles.backText}>← Voltar</Text>
-      </TouchableOpacity>
       <View style={styles.topRightStack}>
         {selectedEpisode && !selectedEpisode.url.startsWith('file://') && !isLive && (
           <TouchableOpacity
@@ -1003,8 +1037,8 @@ export default function PlayerScreen() {
           </TouchableOpacity>
         )}
       </View>
-      {(selectedEpisode?.title || paramTitle) && (
-        <View style={styles.titleContainer}>
+      {titleVisible && (selectedEpisode?.title || paramTitle) && (
+        <View style={styles.titleContainer} pointerEvents="none">
           <Text style={styles.titleText} numberOfLines={2}>
             {selectedEpisode?.title || paramTitle}
           </Text>
